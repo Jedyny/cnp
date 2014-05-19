@@ -63,11 +63,13 @@ public class TcpSegment {
 		this.checksum = checksum;
 	}
 
-	public static TcpSegment fromByteArray(byte[] data) {
+	// since data field in IP.Packet is reused and may contain additional
+	// garbage, "real" data length argument is provided here
+	public static TcpSegment fromByteArray(byte[] data, int length) {
 		ByteBuffer buffer = ByteBuffer.wrap(data);
 
 		TcpSegment segment = new TcpSegment();
-		segment.data = new byte[data.length - 40];
+		segment.data = new byte[length - 40];
 
 		segment.from = buffer.getShort();
 		segment.to = buffer.getShort();
@@ -102,7 +104,49 @@ public class TcpSegment {
 	}
 	// @formatter:on
 
+	
+	
 	private TcpSegment() {
+	}
+
+	public short getFrom() {
+		return from;
+	}
+
+	public short getTo() {
+		return to;
+	}
+
+	public int getSeq() {
+		return seq;
+	}
+
+	public int getAck() {
+		return ack;
+	}
+
+	public boolean isAckSet() {
+		return (flags & ACK_FLAG) != 0;
+	}
+	
+	public boolean isPushSet() {
+		return (flags & PUSH_FLAG) != 0;
+	}
+	
+	public boolean isSynSet() {
+		return (flags & SYN_FLAG) != 0;
+	}
+	
+	public boolean isFinSet() {
+		return (flags & FIN_FLAG) != 0;
+	}		
+
+	public short getChecksum() {
+		return checksum;
+	}
+
+	public byte[] getData() {
+		return data;
 	}
 
 	private short from;
