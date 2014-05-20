@@ -109,12 +109,33 @@ public final class Socket {
 	}
 	
 	private short checksumFor(TcpSegment segment) {
-		// TODO: Method stub
-		return 0;
+		long sum = 0;
+		
+		// ip pseudoheader
+		sum += (localAddress >>> 16) + localAddress & 0xffff; 
+		sum += (remoteAddress >>> 16) + remoteAddress & 0xffff;
+		sum += IP.TCP_PROTOCOL;
+		sum += (segment.length >>> 16) + segment.length & 0xffff;
+		
+		// real tcp
+		for (int i = 0; i < segment.length - 1; i += 2) {
+			sum += (segment.buffer.getShort(i) & 0xffff);
+		}
+		
+		if (segment.length % 2 != 0) {
+			sum += (segment.buffer.get(segment.length - 1) & 0xffff) << 8; 
+		}
+		
+		// remainder
+		sum += (sum >>> 16);
+		
+		// one's complement
+		sum = ~sum & 0xffff;
+		return (short) sum;
 	}
 	
 	private boolean isValid(TcpSegment segment) {
-		return checksumFor(segment) == segment.checksum;
+		return checksumFor(segment) == 0;
 	}
 	
 	private Packet packetFrom(TcpSegment segment) {
@@ -123,16 +144,17 @@ public final class Socket {
 		packet.protocol = IP.TCP_PROTOCOL;
 		packet.id = 1;
 		packet.data = segment.toByteArray();
-		packet.length = packet.data.length;
+		packet.length = segment.length;
 		return packet;
 	}
 	
 	private TcpSegment segmentFrom(Packet packet) {
-		return TcpSegment.fromByteArray(packet.data, packet.length);
+		segment.fromByteArray(packet.data, packet.length);
+		return segment;
 	}
 	
 	private void sendSegment(TcpSegment segment) throws IOException {
-		segment.checksum = checksumFor(segment);
+		segment.setChecksum(checksumFor(segment));
 		ip.ip_send(packetFrom(segment));
 	}
 	
