@@ -108,7 +108,8 @@ public final class Socket {
 		return false;
 	}
 	
-	private short checksumFor(TcpSegment segment) {
+	// package to simplify testing
+	/* package */ short checksumFor(TcpSegment segment) {
 		long sum = 0;
 		
 		// ip pseudoheader
@@ -153,12 +154,15 @@ public final class Socket {
 		return segment;
 	}
 	
-	private void sendSegment(TcpSegment segment) throws IOException {
+	// package to simplify testing
+	/* package */ void sendSegment(TcpSegment segment) throws IOException {
 		segment.setChecksum(checksumFor(segment));
 		ip.ip_send(packetFrom(segment));
 	}
 	
-	private void receiveSegment(TcpSegment segment) throws IOException {
+	
+	// package to simplify testing
+	/* package */ void receiveSegment(TcpSegment segment) throws IOException {
 		do {
 			ip.ip_receive(packet);
 			remoteAddress = packet.source;
