@@ -63,6 +63,10 @@ import java.nio.ByteBuffer;
 		buffer.putShort(FLAGS_IX, flags);
 	}
 	
+	public void setWindowSize(short size) {
+		buffer.putShort(WINDOW_IX, size);
+	}
+	
 	public void setChecksum(short checksum) {
 		buffer.putShort(CHECKSUM_IX, checksum);
 	}

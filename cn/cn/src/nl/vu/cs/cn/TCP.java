@@ -42,4 +42,8 @@ public class TCP {
 	public Socket socket(int port) {
 		return new Socket(ip, port);
 	}
+	
+	/* package */ static int getNextSeq() {
+		return 20051498;
+	}
 }

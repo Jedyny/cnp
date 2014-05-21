@@ -40,17 +40,76 @@ public final class Socket {
 	 *            the port to connect to
 	 * @return true if the connect succeeded.
 	 */
-	public boolean connect(IpAddress dst, int port) {
-
+	public boolean connect(IpAddress dst, int port) throws IOException {
+		checkState(state == ConnectionState.CLOSED);
+		
+		localSequenceNumber = TCP.getNextSeq();
+		remoteAddress = dst.getAddress(); // TODO: Should be in big-endian!
+		remotePort = (short) port;
+		
+		segment.setFrom(localPort);
+		segment.setTo(remotePort);
+		segment.setSeq(localSequenceNumber);
+		segment.setFlags((short) TcpSegment.SYN_FLAG);
+		segment.setWindowSize((short) 1);
+		sendSegment(segment);
+		
+		receiveSegment(segment); // TODO: Receive with timeout
+		
+		if (segment.getFrom() == remotePort && segment.hasSynFlag() && segment.hasAckFlag() && segment.getAck() == localSequenceNumber + 1) {
+			remoteSequenceNumber = segment.getSeq();
+			
+			segment.setFrom(localPort);
+			segment.setTo(remotePort);
+			segment.setSeq(localSequenceNumber);
+			segment.setAck(remoteSequenceNumber + 1);
+			segment.setFlags((short) TcpSegment.ACK_FLAG);
+			segment.setWindowSize((short) 1);
+			sendSegment(segment);
+			
+			state = ConnectionState.ESTABLISHED;
+			return true;
+		}
+		
 		return false;
 	}
 
+	// take into account that this method don't have timeout after receiving first syn
+	// so it'll block on half-open connection
 	/**
 	 * Accept a connection on this socket. This call blocks until a connection
 	 * is made.
 	 */
 	public void accept() throws IOException {
-
+		checkState(state == ConnectionState.CLOSED);
+		
+		for (;;) {
+			do {
+				receiveSegment(segment);
+			} while (!segment.hasSynFlag());
+	
+			localSequenceNumber = TCP.getNextSeq();
+			remotePort = segment.getFrom();
+			remoteSequenceNumber = segment.getSeq();
+			
+			segment.setFrom(localPort);
+			segment.setTo(remotePort);
+			segment.setSeq(localSequenceNumber);
+			segment.setAck(remoteSequenceNumber + 1);
+			segment.setFlags((short) (TcpSegment.SYN_FLAG | TcpSegment.ACK_FLAG));
+			segment.setWindowSize((short) 1);
+			sendSegment(segment);
+			
+			++localSequenceNumber;
+			
+			receiveSegment(segment); // <-- should receive with timeout
+			
+			if (segment.getFrom() == remotePort && !segment.hasSynFlag() && segment.hasAckFlag() && segment.getAck() == localSequenceNumber + 1) {
+				break;
+			}
+		}
+		
+		state = ConnectionState.ESTABLISHED;
 	}
 
 	/**
@@ -136,7 +195,7 @@ public final class Socket {
 	}
 	
 	private boolean isValid(TcpSegment segment) {
-		return checksumFor(segment) == 0;
+		return segment.length < TcpSegment.TCP_HEADER_LENGTH && checksumFor(segment) == 0;
 	}
 	
 	private Packet packetFrom(TcpSegment segment) {
@@ -160,16 +219,14 @@ public final class Socket {
 		ip.ip_send(packetFrom(segment));
 	}
 	
-	
 	// package to simplify testing
 	/* package */ void receiveSegment(TcpSegment segment) throws IOException {
 		do {
 			ip.ip_receive(packet);
-			remoteAddress = packet.source;
 			segment = segmentFrom(packet);
 		} while (!isValid(segment));
 	}
-
+	
 	private IP ip;
 
 	private ConnectionState state;
@@ -178,9 +235,13 @@ public final class Socket {
 
 	private int remoteAddress;
 
-	private int localPort;
+	private short localPort;
 
-	private int remotePort;
+	private short remotePort;
+	
+	private int localSequenceNumber;
+	
+	private int remoteSequenceNumber;
 	
 	private Packet packet;
 	
