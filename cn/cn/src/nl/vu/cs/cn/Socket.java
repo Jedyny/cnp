@@ -118,7 +118,7 @@ public final class Socket {
 	 */
 	public int read(byte[] buf, int offset, int maxlen) {
 		checkNotNull(buf);
-		checkState(state == ConnectionState.ESTABLISHED);
+		checkState(state == ConnectionState.ESTABLISHED || state == ConnectionState.WRITE_CLOSED);
 		
 		// Read from the socket here.
 
@@ -138,7 +138,7 @@ public final class Socket {
 	 */
 	public int write(byte[] buf, int offset, int len) {
 		checkNotNull(buf);
-		checkState(state == ConnectionState.ESTABLISHED);
+		checkState(state == ConnectionState.ESTABLISHED || state == ConnectionState.READ_CLOSED);
 
 		// Write to the socket here.
 
@@ -151,12 +151,25 @@ public final class Socket {
 	 * 
 	 * @return true unless no connection was open.
 	 */
-	public boolean close() {
-		checkState(state == ConnectionState.ESTABLISHED);
+	public boolean close() throws IOException {
+		if (state == ConnectionState.CLOSED || state == ConnectionState.WRITE_CLOSED) {
+			return false;
+		}
 		
-		// Close the socket cleanly here.
+		fillBasicSegmentData(segment);
+		segment.setFlags((short) (TcpSegment.FIN_FLAG | TcpSegment.PUSH_FLAG));
+		sendSegment(segment);
+		
+		receiveSegment(segment);
+		if (segment.getFrom() == remotePort && segment.hasAckFlag() && segment.getAck() == localSequenceNumber + 1) {
+			return false;
+		}
 
-		return false;
+		return true;
+	}
+	
+	private void onFinReceived() { 
+		
 	}
 	
 	// package to simplify testing

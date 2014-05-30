@@ -2,9 +2,6 @@ package nl.vu.cs.cn;
 
 import java.io.IOException;
 
-import nl.vu.cs.cn.IP.IpAddress;
-import nl.vu.cs.cn.IP.Packet;
-
 /**
  * This class represents a TCP stack. It should be built on top of the IP stack
  * which is bound to a given IP address.
