@@ -43,7 +43,7 @@ public class TCP {
 		return new Socket(ip, port);
 	}
 	
-	/* package */ static int getNextSeq() {
+	/* package */ static int getInitSequenceNumber() {
 		return 20051498;
 	}
 }

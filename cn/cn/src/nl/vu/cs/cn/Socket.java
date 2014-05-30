@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.IP.Packet;
+import nl.vu.cs.cn.util.Bits;
 
 import static nl.vu.cs.cn.util.Preconditions.checkNotNull;
 import static nl.vu.cs.cn.util.Preconditions.checkState;
@@ -43,15 +44,12 @@ public final class Socket {
 	public boolean connect(IpAddress dst, int port) throws IOException {
 		checkState(state == ConnectionState.CLOSED);
 		
-		localSequenceNumber = TCP.getNextSeq();
-		remoteAddress = dst.getAddress(); // TODO: Should be in big-endian!
+		localSequenceNumber = TCP.getInitSequenceNumber();
+		remoteAddress = Bits.reverseOrder(dst.getAddress()); 
 		remotePort = (short) port;
 		
-		segment.setFrom(localPort);
-		segment.setTo(remotePort);
-		segment.setSeq(localSequenceNumber);
+		fillBasicSegmentData(segment);
 		segment.setFlags((short) TcpSegment.SYN_FLAG);
-		segment.setWindowSize((short) 1);
 		sendSegment(segment);
 		
 		receiveSegment(segment); // TODO: Receive with timeout
@@ -59,12 +57,9 @@ public final class Socket {
 		if (segment.getFrom() == remotePort && segment.hasSynFlag() && segment.hasAckFlag() && segment.getAck() == localSequenceNumber + 1) {
 			remoteSequenceNumber = segment.getSeq();
 			
-			segment.setFrom(localPort);
-			segment.setTo(remotePort);
-			segment.setSeq(localSequenceNumber);
+			fillBasicSegmentData(segment);
 			segment.setAck(remoteSequenceNumber + 1);
 			segment.setFlags((short) TcpSegment.ACK_FLAG);
-			segment.setWindowSize((short) 1);
 			sendSegment(segment);
 			
 			state = ConnectionState.ESTABLISHED;
@@ -88,16 +83,13 @@ public final class Socket {
 				receiveSegment(segment);
 			} while (!segment.hasSynFlag());
 	
-			localSequenceNumber = TCP.getNextSeq();
+			localSequenceNumber = TCP.getInitSequenceNumber();
 			remotePort = segment.getFrom();
 			remoteSequenceNumber = segment.getSeq();
 			
-			segment.setFrom(localPort);
-			segment.setTo(remotePort);
-			segment.setSeq(localSequenceNumber);
+			fillBasicSegmentData(segment);
 			segment.setAck(remoteSequenceNumber + 1);
 			segment.setFlags((short) (TcpSegment.SYN_FLAG | TcpSegment.ACK_FLAG));
-			segment.setWindowSize((short) 1);
 			sendSegment(segment);
 			
 			++localSequenceNumber;
@@ -199,8 +191,8 @@ public final class Socket {
 	}
 	
 	private Packet packetFrom(TcpSegment segment) {
-		packet.source = localAddress;
-		packet.destination = remoteAddress;
+		packet.source = Bits.reverseOrder(localAddress);
+		packet.destination = Bits.reverseOrder(remoteAddress);
 		packet.protocol = IP.TCP_PROTOCOL;
 		packet.id = 1;
 		packet.data = segment.toByteArray();
@@ -211,6 +203,13 @@ public final class Socket {
 	private TcpSegment segmentFrom(Packet packet) {
 		segment.fromByteArray(packet.data, packet.length);
 		return segment;
+	}
+	
+	private void fillBasicSegmentData(TcpSegment segment) {
+		segment.setFrom(localPort);
+		segment.setTo(remotePort);
+		segment.setSeq(localSequenceNumber);
+		segment.setWindowSize((short) 1);
 	}
 	
 	// package to simplify testing
@@ -231,9 +230,9 @@ public final class Socket {
 
 	private ConnectionState state;
 
-	private int localAddress;
-
-	private int remoteAddress;
+	private int localAddress; // in big-endian
+	
+	private int remoteAddress; // in big-endian
 
 	private short localPort;
 
