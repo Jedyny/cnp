@@ -4,23 +4,26 @@ import java.nio.ByteBuffer;
 
 /* package */ final class TcpSegment {
 
+	/* package */ static int TCP_MAX_DATA_LENGTH = 40;
+	
 	public void fromByteArray(byte[] data, int length) {
 		if (data != buffer.array()) {
-			buffer.put(data, 0, 0);
+			System.arraycopy(data, 0, buffer.array(), 0, length);
 		}
 		this.length = length;
+		this.dataLength = length - TCP_HEADER_LENGTH;
 	}
 
 	public byte[] toByteArray() {
 		return buffer.array();
 	}
 	
-	public short getFrom() {
-		return buffer.getShort(FROM_IX);
+	public short getFromPort() {
+		return buffer.getShort(FROM_PORT_IX);
 	}
 	
-	public short getTo() {
-		return buffer.getShort(TO_IX);
+	public short getToPort() {
+		return buffer.getShort(TO_PORT_IX);
 	}
 	
 	public int getSeq() {
@@ -29,6 +32,10 @@ import java.nio.ByteBuffer;
 	
 	public int getAck() {
 		return buffer.getInt(ACK_IX);
+	}
+	
+	public void getData(byte[] dst, int offset) {
+		System.arraycopy(buffer.array(), DATA_IX, dst, offset, dataLength);
 	}
 	
 	public boolean hasSynFlag() {
@@ -44,11 +51,11 @@ import java.nio.ByteBuffer;
 	}
 	
 	public void setFrom(short from) {
-		buffer.putShort(FROM_IX, from);
+		buffer.putShort(FROM_PORT_IX, from);
 	}
 	
 	public void setTo(short to) {
-		buffer.putShort(TO_IX, to);
+		buffer.putShort(TO_PORT_IX, to);
 	}
 	
 	public void setSeq(int seq) {
@@ -71,9 +78,13 @@ import java.nio.ByteBuffer;
 		buffer.putShort(CHECKSUM_IX, checksum);
 	}
 	
-	/* package */ static int TCP_HEADER_LENGTH = 20;
+	public void setData(byte[] src, int offset, int length) {
+		System.arraycopy(src, offset, buffer.array(), DATA_IX, length);
+		this.length = length + TCP_MAX_DATA_LENGTH;
+		this.dataLength = length;
+	}
 	
-	/* package */ static int TCP_MAX_LENGTH = 40;
+	/* package */ static int TCP_HEADER_LENGTH = 20;
 	
 	/* package */ static short ACK_FLAG = 16;
 
@@ -83,13 +94,15 @@ import java.nio.ByteBuffer;
 
 	/* package */ static short FIN_FLAG = 1;
 	
-	/* package */ ByteBuffer buffer = ByteBuffer.allocate(TCP_MAX_LENGTH);
+	/* package */ ByteBuffer buffer = ByteBuffer.allocate(TCP_HEADER_LENGTH + TCP_MAX_DATA_LENGTH);
 	
 	/* package */ int length;
 	
-	private static int FROM_IX = 0;
+	/* package */ int dataLength;
 	
-	private static int TO_IX = 2;
+	private static int FROM_PORT_IX = 0;
+	
+	private static int TO_PORT_IX = 2;
 	
 	private static int SEQ_IX = 4;
 	
