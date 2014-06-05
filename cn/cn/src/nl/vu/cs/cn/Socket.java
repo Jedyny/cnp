@@ -244,8 +244,8 @@ public final class Socket {
 	}
 
 	private void fillBasicSegmentData(TcpSegment segment) {
-		segment.setFrom(localPort);
-		segment.setTo(remotePort);
+		segment.setFromPort(localPort);
+		segment.setToPort(remotePort);
 		segment.setSeq(localSequenceNumber);
 		segment.setWindowSize((short) 1);
 	}

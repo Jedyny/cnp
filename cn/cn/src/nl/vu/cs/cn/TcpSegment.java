@@ -50,11 +50,11 @@ import java.nio.ByteBuffer;
 		return (buffer.getShort(FLAGS_IX) & FIN_FLAG) != 0;
 	}
 	
-	public void setFrom(short from) {
+	public void setFromPort(short from) {
 		buffer.putShort(FROM_PORT_IX, from);
 	}
 	
-	public void setTo(short to) {
+	public void setToPort(short to) {
 		buffer.putShort(TO_PORT_IX, to);
 	}
 	
