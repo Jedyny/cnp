@@ -1,5 +1,10 @@
 package nl.vu.cs.cn;
 
+import static nl.vu.cs.cn.TcpSegment.ACK_FLAG;
+import static nl.vu.cs.cn.TcpSegment.FIN_FLAG;
+import static nl.vu.cs.cn.TcpSegment.PUSH_FLAG;
+import static nl.vu.cs.cn.TcpSegment.SYN_FLAG;
+
 import static nl.vu.cs.cn.util.Preconditions.checkNotNull;
 import static nl.vu.cs.cn.util.Preconditions.checkState;
 
@@ -115,7 +120,7 @@ public final class Socket {
 		int currentOffset = offset;
 		while (currentOffset - offset < maxlen) { 
 			if (receiveDataSegment(segment, buf, currentOffset)) {
-				currentOffset += segment.length - TcpSegment.TCP_HEADER_LENGTH;
+				currentOffset += segment.dataLength + segment.getSeq() - 1 - remoteSequenceNumber;  
 				
 				if (!sendAckSegment(segment)) {
 					return -1;
@@ -145,19 +150,24 @@ public final class Socket {
 		checkNotNull(buf);
 		checkState(state == ConnectionState.ESTABLISHED || state == ConnectionState.WRITE_ONLY);
 
-		int dataLength, dataLeft = len;
+		int dataLeft = len;
+		int currOffset = offset;
 		while (dataLeft > 0) {
-			dataLength = Math.min(dataLeft, TcpSegment.TCP_MAX_DATA_LENGTH);
+			int dataLength = Math.min(dataLeft, TcpSegment.TCP_MAX_DATA_LENGTH);
 			dataLeft -= dataLength;
 			
-			if (!sendDataSegment(segment, buf, offset, dataLength)) {
+			if (!sendDataSegment(segment, buf, currOffset, dataLength)) {
 				return -1;
 			}
-			++localSequenceNumber;
 			
 			if (!receiveAckSegment(segment)) {
 				return -1;
 			}
+			
+			int acknowledged = segment.getAck() - localSequenceNumber;
+			currOffset += acknowledged;
+			dataLeft -= acknowledged;
+			localSequenceNumber = segment.getAck();
 		}
 		return len;
 	}
@@ -252,26 +262,28 @@ public final class Socket {
 
 	private boolean sendSynSegment(TcpSegment segment) {
 		fillBasicSegmentData(segment);
-		segment.setFlags((short) TcpSegment.SYN_FLAG);
+		segment.setFlags((short) (SYN_FLAG | PUSH_FLAG));
 		return sendSegment(segment);
 	}
 
 	private boolean sendAckSegment(TcpSegment segment) {
 		fillBasicSegmentData(segment);
 		segment.setAck(remoteSequenceNumber + 1);
-		segment.setFlags((short) TcpSegment.ACK_FLAG);
+		segment.setFlags((short) (ACK_FLAG | PUSH_FLAG));
 		return sendSegment(segment);
 	}
 
 	private boolean sendSynAckSegment(TcpSegment segment) {
 		fillBasicSegmentData(segment);
 		segment.setAck(remoteSequenceNumber + 1);
-		segment.setFlags((short) (TcpSegment.SYN_FLAG | TcpSegment.ACK_FLAG));
+		segment.setFlags((short) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
 		return sendSegment(segment);
 	}
 	
 	private boolean sendDataSegment(TcpSegment segment, byte[] src, int offset, int len) {
-		return true;
+		fillBasicSegmentData(segment);
+		segment.setData(src, offset, len);
+		return sendSegment(segment);
 	}
 
 	// package to simplify testing
@@ -302,7 +314,7 @@ public final class Socket {
 				|| segment.hasSynFlag()
 				|| !segment.hasAckFlag() 
 				|| segment.hasFinFlag()
-				|| segment.getAck() != localSequenceNumber + 1);
+				|| segment.getAck() < localSequenceNumber + 1);
 		return true;
 	}
 	
@@ -318,6 +330,13 @@ public final class Socket {
 	}
 	
 	private boolean receiveDataSegment(TcpSegment segment, byte[] dst, int offset) {
+		do { 
+			receiveSegment(segment);
+		} while (segment.getFromPort() != remotePort
+		 		|| segment.hasAckFlag()
+		 		|| segment.hasSynFlag()
+		 		|| segment.hasFinFlag()
+		 		|| segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber  >= 0);
 		return true;
 	}
 	// @formatter:on
