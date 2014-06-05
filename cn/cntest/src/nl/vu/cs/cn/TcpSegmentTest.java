@@ -12,7 +12,7 @@ public class TcpSegmentTest extends TestCase {
 		segment.setFromPort((short) 80);
 		segment.setSeq(123456789);
 		segment.setAck(123456790);
-		segment.setFlags((short) (ACK_FLAG | SYN_FLAG));
+		segment.setFlags((byte) (ACK_FLAG | SYN_FLAG));
 		byte[] arr = segment.toByteArray();
 		
 		TcpSegment restoredSegment = new TcpSegment();
@@ -35,7 +35,7 @@ public class TcpSegmentTest extends TestCase {
 		segment.setFromPort((short) 80);
 		segment.setSeq(123456789);
 		segment.setAck(123456790);
-		segment.setFlags((short) (ACK_FLAG | SYN_FLAG));
+		segment.setFlags((byte) (ACK_FLAG | SYN_FLAG));
 		segment.setData(data, 0, data.length);
 		
 		assertEquals(segment.getToPort(), 20);
@@ -60,7 +60,7 @@ public class TcpSegmentTest extends TestCase {
 		segment.setFromPort((short) 80);
 		segment.setSeq(123456789);
 		segment.setAck(123456790);
-		segment.setFlags((short) (ACK_FLAG | SYN_FLAG));
+		segment.setFlags((byte) (ACK_FLAG | SYN_FLAG));
 		segment.setData(data, 10, 5);
 		
 		assertEquals(segment.getToPort(), 20);

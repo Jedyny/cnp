@@ -34,20 +34,32 @@ import java.nio.ByteBuffer;
 		return buffer.getInt(ACK_IX);
 	}
 	
+	public short getWindow() {
+		return buffer.getShort(WINDOW_IX);
+	}
+	
+	public short getChecksum() {
+		return buffer.getShort(CHECKSUM_IX);
+	}
+	
 	public void getData(byte[] dst, int dstOffset) {
 		System.arraycopy(buffer.array(), DATA_IX, dst, dstOffset, dataLength);
 	}
 	
 	public boolean hasSynFlag() {
-		return (buffer.getShort(FLAGS_IX) & SYN_FLAG) != 0;
+		return (buffer.get(FLAGS_IX) & SYN_FLAG) != 0;
 	}
 	
 	public boolean hasAckFlag() {
-		return (buffer.getShort(FLAGS_IX) & ACK_FLAG) != 0;
+		return (buffer.get(FLAGS_IX) & ACK_FLAG) != 0;
 	}
 	
 	public boolean hasFinFlag() {
-		return (buffer.getShort(FLAGS_IX) & FIN_FLAG) != 0;
+		return (buffer.get(FLAGS_IX) & FIN_FLAG) != 0;
+	}
+	
+	public boolean hasPushFlag() {
+		return (buffer.get(FLAGS_IX) & PUSH_FLAG) != 0;
 	}
 	
 	public void setFromPort(short from) {
@@ -67,8 +79,8 @@ import java.nio.ByteBuffer;
 		buffer.putInt(ACK_IX, ack);
 	}
 	
-	public void setFlags(short flags) {
-		buffer.putShort(FLAGS_IX, flags);
+	public void setFlags(byte flags) {
+		buffer.put(FLAGS_IX, flags);
 	}
 	
 	public void setWindowSize(short size) {
@@ -83,6 +95,27 @@ import java.nio.ByteBuffer;
 		System.arraycopy(src, srcOffset, buffer.array(), DATA_IX, length);
 		this.length = length + TCP_MAX_DATA_LENGTH;
 		this.dataLength = length;
+	}
+	
+	@Override
+	public String toString() {
+		byte[] data = new byte[dataLength];
+		getData(data, 0);
+		
+		StringBuilder builder = new StringBuilder("[");
+		builder.append("from_port = ").append(getFromPort()).append("; ");
+		builder.append("to_port = ").append(getToPort()).append("; ");
+		builder.append("seq_number = ").append(getSeq()).append("; ");
+		builder.append("ack_number = ").append(getAck()).append("; ");
+		builder.append("syn_flag = ").append(hasSynFlag()).append("; ");
+		builder.append("ack_flag = ").append(hasAckFlag()).append("; ");
+		builder.append("fin_flag = ").append(hasFinFlag()).append("; ");
+		builder.append("push_flag = ").append(hasPushFlag()).append("; ");
+		builder.append("window_size = ").append(getWindow()).append("; ");
+		builder.append("checksum = ").append(getChecksum()).append("; ");
+		builder.append("data = \"").append(new String(data)).append("\"; ");
+		
+		return builder.toString();
 	}
 	
 	/* package */ static int TCP_HEADER_LENGTH = 20;

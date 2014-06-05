@@ -12,7 +12,6 @@ import java.io.IOException;
 
 import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.IP.Packet;
-import nl.vu.cs.cn.util.Bits;
 
 import static nl.vu.cs.cn.util.Preconditions.checkNotNull;
 import static nl.vu.cs.cn.util.Preconditions.checkState;
@@ -267,21 +266,21 @@ public final class Socket {
 
 	private boolean sendSynSegment(TcpSegment segment) {
 		fillBasicSegmentData(segment);
-		segment.setFlags((short) (SYN_FLAG | PUSH_FLAG));
+		segment.setFlags((byte) (SYN_FLAG | PUSH_FLAG));
 		return sendSegment(segment);
 	}
 
 	private boolean sendAckSegment(TcpSegment segment) {
 		fillBasicSegmentData(segment);
 		segment.setAck(remoteSequenceNumber + 1);
-		segment.setFlags((short) (ACK_FLAG | PUSH_FLAG));
+		segment.setFlags((byte) (ACK_FLAG | PUSH_FLAG));
 		return sendSegment(segment);
 	}
 
 	private boolean sendSynAckSegment(TcpSegment segment) {
 		fillBasicSegmentData(segment);
 		segment.setAck(remoteSequenceNumber + 1);
-		segment.setFlags((short) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
+		segment.setFlags((byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
 		return sendSegment(segment);
 	}
 	
@@ -293,7 +292,7 @@ public final class Socket {
 	
 	private boolean sendFinSegment(TcpSegment segment) {
 		fillBasicSegmentData(segment);
-		segment.setFlags((short) (FIN_FLAG | PUSH_FLAG));
+		segment.setFlags((byte) (FIN_FLAG | PUSH_FLAG));
 		return sendSegment(segment);
 	}
 
@@ -367,20 +366,21 @@ public final class Socket {
 
 	private IP ip;
 
-	private ConnectionState state;
+	/* package */ ConnectionState state;
 
-	private int localAddress; // in big-endian
-	/*package*/ int remoteAddress; // n big-endian
-
-	private short localPort;
-
-	private short remotePort;
-
-	private int localSequenceNumber;
-
-	private int remoteSequenceNumber;
+	/* package */ int localAddress; // in big-endian
 	
-	private Packet packet = new Packet();
+	/* package */ int remoteAddress; // in big-endian
+
+	/* package */ short localPort;
+
+	/* package */ short remotePort;
+
+	/* package */ int localSequenceNumber;
+
+	/* package */ int remoteSequenceNumber;
 	
-	private TcpSegment segment = new TcpSegment();
+	/* package */ Packet packet = new Packet();
+	
+	/* package */ TcpSegment segment = new TcpSegment();
 }

@@ -8,48 +8,67 @@ import static nl.vu.cs.cn.TcpSegment.SYN_FLAG;
 import java.io.IOException;
 
 import nl.vu.cs.cn.IP.IpAddress;
-import nl.vu.cs.cn.util.Bits;
 import junit.framework.TestCase;
 
 public class TCPTest extends TestCase {
 
 	public static int SENDER_ADDR = 123;
+	
 	public static int RECEIVER_ADDR = 125;
 	
-	public void testSocketTest(){
-		try {
-			TCP tcpSenderAddress = new TCP(SENDER_ADDR);
-			TCP tcpReceiverAddress = new TCP(RECEIVER_ADDR);
-			Socket senderSocket = tcpSenderAddress.socket();
-			Socket receiverSocket = tcpReceiverAddress.socket();
-			int seq_num = tcpReceiverAddress.getInitSequenceNumber();
-			
-			int ipaddress = IpAddress.getAddress("192.168.0." + RECEIVER_ADDR).getAddress();
-			senderSocket.remoteAddress=Integer.reverseBytes(ipaddress); 
-			
-			receiverSocket.remoteAddress = Integer.reverseBytes(IpAddress.getAddress("192.168.0." + SENDER_ADDR).getAddress());
-			
-			TcpSegment senderSegment = FillSegmentData((short)100,(short)120,seq_num,12,(short)(ACK_FLAG | PUSH_FLAG | SYN_FLAG | FIN_FLAG),(short)4); 
-			TcpSegment receiverSegment = FillSegmentData((short)120,(short)100,seq_num,12,(short)(ACK_FLAG | PUSH_FLAG | SYN_FLAG | FIN_FLAG),(short)4); 
-			senderSocket.sendSegment(senderSegment);
-			receiverSocket.receiveSegment(receiverSegment);
-						
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+	public static short SENDER_PORT = 1234;
+	
+	public static short RECEIVER_PORT = 4321;
+	
+	private Socket sender;
+	
+	private Socket receiver;
+
+	@Override
+	public void setUp() throws IOException {
+		sender = new TCP(SENDER_ADDR).socket(SENDER_PORT);
+		receiver = new TCP(RECEIVER_ADDR).socket(RECEIVER_PORT);
 		
+		int senderIpLittleEndian = IpAddress.getAddress("192.168.0." + SENDER_ADDR).getAddress();
+		int receiverIpLittleEndian = IpAddress.getAddress("192.168.0." + RECEIVER_ADDR).getAddress();
+		
+		sender.remoteAddress = Integer.reverseBytes(receiverIpLittleEndian);
+		receiver.remoteAddress = Integer.reverseBytes(senderIpLittleEndian);
+		
+		sender.localSequenceNumber = TCP.getInitSequenceNumber();
+		receiver.localSequenceNumber = TCP.getInitSequenceNumber();
+		
+		sender.remotePort = RECEIVER_PORT;
+		receiver.remotePort = SENDER_PORT;
 	}
 	
-	public TcpSegment FillSegmentData(short to, short from, int seq, int ack, short flags, short size){
+	public void testOneSendWithoutData() {
+		TcpSegment segment = newSegment(sender, 12345, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
+		sender.sendSegment(segment);
+		receiver.receiveSegment(receiver.segment);
+		
+		assertEquals(receiver.segment.getFromPort(), SENDER_PORT);
+		assertEquals(receiver.segment.getToPort(), RECEIVER_PORT);
+		assertEquals(receiver.segment.getSeq(), sender.localSequenceNumber);
+		assertEquals(receiver.segment.getAck(), 12345);
+		assertTrue(receiver.segment.hasAckFlag());
+		assertTrue(receiver.segment.hasSynFlag());
+		assertTrue(receiver.segment.hasPushFlag());
+		assertFalse(receiver.segment.hasFinFlag());
+		assertEquals(receiver.segment.length, TcpSegment.TCP_HEADER_LENGTH);
+		assertEquals(receiver.segment.dataLength, 0);
+	}
+
+	private TcpSegment newSegment(Socket socket, int ack,
+			byte flags) {
 		TcpSegment segment = new TcpSegment();
-		segment.setToPort(to);
-		segment.setFromPort(from);
-		segment.setSeq(seq);
+		segment.setFromPort(socket.localPort);
+		segment.setToPort(socket.remotePort);
+		segment.setSeq(socket.localSequenceNumber);
 		segment.setAck(ack);
 		segment.setFlags(flags);
-		segment.setWindowSize(size);
-		
+		segment.setWindowSize((short) 1);
+
 		return segment;
 	}
-	
 }
