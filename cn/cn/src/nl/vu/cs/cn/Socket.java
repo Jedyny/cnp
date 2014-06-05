@@ -183,15 +183,12 @@ public final class Socket {
 			return false;
 		}
 
-		segment.setFlags((short) (TcpSegment.FIN_FLAG | TcpSegment.PUSH_FLAG));
-		sendSegment(segment);
-
-		receiveSegment(segment);
-		if (segment.getFromPort() == remotePort && segment.hasAckFlag()
-				&& segment.getAck() == localSequenceNumber + 1) {
+		if (!sendFinSegment(segment)) {
 			return false;
 		}
 
+		// we closed the connection and we do not care if we receive it or not
+		receiveAckSegment(segment);
 		return true;
 	}
 
@@ -283,6 +280,12 @@ public final class Socket {
 	private boolean sendDataSegment(TcpSegment segment, byte[] src, int offset, int len) {
 		fillBasicSegmentData(segment);
 		segment.setData(src, offset, len);
+		return sendSegment(segment);
+	}
+	
+	private boolean sendFinSegment(TcpSegment segment) {
+		fillBasicSegmentData(segment);
+		segment.setFlags((short) (FIN_FLAG | PUSH_FLAG));
 		return sendSegment(segment);
 	}
 
