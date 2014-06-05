@@ -25,10 +25,12 @@ public class TCPTest extends TestCase {
 			int seq_num = tcpReceiverAddress.getInitSequenceNumber();
 			
 			int ipaddress = IpAddress.getAddress("192.168.0." + RECEIVER_ADDR).getAddress();
-			senderSocket.remoteAddress=Bits.reverseOrder(ipaddress); 
+			senderSocket.remoteAddress=Integer.reverseBytes(ipaddress); 
 			
-			TcpSegment senderSegment = FillSegmentData((short)100,(short)120,seq_num,12,(short)(ACK_FLAG | PUSH_FLAG | SYN_FLAG | FIN_FLAG),(short)4,(short)10); 
-			TcpSegment receiverSegment = FillSegmentData((short)120,(short)100,seq_num,12,(short)(ACK_FLAG | PUSH_FLAG | SYN_FLAG | FIN_FLAG),(short)4,(short)10); 
+			receiverSocket.remoteAddress = Integer.reverseBytes(IpAddress.getAddress("192.168.0." + SENDER_ADDR).getAddress());
+			
+			TcpSegment senderSegment = FillSegmentData((short)100,(short)120,seq_num,12,(short)(ACK_FLAG | PUSH_FLAG | SYN_FLAG | FIN_FLAG),(short)4); 
+			TcpSegment receiverSegment = FillSegmentData((short)120,(short)100,seq_num,12,(short)(ACK_FLAG | PUSH_FLAG | SYN_FLAG | FIN_FLAG),(short)4); 
 			senderSocket.sendSegment(senderSegment);
 			receiverSocket.receiveSegment(receiverSegment);
 						
@@ -38,7 +40,7 @@ public class TCPTest extends TestCase {
 		
 	}
 	
-	public TcpSegment FillSegmentData(short to, short from, int seq, int ack, short flags, short size, short check){
+	public TcpSegment FillSegmentData(short to, short from, int seq, int ack, short flags, short size){
 		TcpSegment segment = new TcpSegment();
 		segment.setToPort(to);
 		segment.setFromPort(from);
@@ -46,7 +48,6 @@ public class TCPTest extends TestCase {
 		segment.setAck(ack);
 		segment.setFlags(flags);
 		segment.setWindowSize(size);
-		segment.setChecksum(check);
 		
 		return segment;
 	}

@@ -97,7 +97,7 @@ import java.nio.ByteBuffer;
 	
 	/* package */ ByteBuffer buffer = ByteBuffer.allocate(TCP_HEADER_LENGTH + TCP_MAX_DATA_LENGTH);
 	
-	/* package */ int length;
+	/* package */ int length = TCP_HEADER_LENGTH;
 	
 	/* package */ int dataLength;
 	

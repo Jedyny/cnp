@@ -22,15 +22,15 @@ import static nl.vu.cs.cn.util.Preconditions.checkState;
  * 
  */
 public final class Socket {
-
+	
 	/**
 	 * Construct a client socket.
 	 */
 	/* package */Socket(IP ip) {
 		this.ip = ip;
 		int ipaddress = ip.getLocalAddress().getAddress();
-		localAddress=Bits.reverseOrder(ipaddress); 
-		
+		localAddress=Integer.reverseBytes(ipaddress); 
+		packet.data = new byte[TcpSegment.TCP_HEADER_LENGTH + TcpSegment.TCP_MAX_DATA_LENGTH];
 	}
 
 	/**
@@ -40,10 +40,8 @@ public final class Socket {
 	 *            the local port to use
 	 */
 	/* package */Socket(IP ip, int port) {
-		this.ip = ip;
-		int ipaddress = ip.getLocalAddress().getAddress();
-		localAddress = Bits.reverseOrder(ipaddress); 
-		localPort = (short)port;
+		this(ip);
+		localPort = (short) port;
 	}
 
 	/**
@@ -61,7 +59,7 @@ public final class Socket {
 		}
 
 		localSequenceNumber = TCP.getInitSequenceNumber();
-		remoteAddress = Bits.reverseOrder(dst.getAddress());
+		remoteAddress = Integer.reverseBytes(dst.getAddress());
 		remotePort = (short) port;
 		if (!sendSynSegment(segment)) {
 			return false;
@@ -132,7 +130,7 @@ public final class Socket {
 				currentOffset += segment.dataLength + segment.getSeq() - 1 - remoteSequenceNumber;  
 				
 				if (!sendAckSegment(segment)) {
-					return -1;
+					return currentOffset - offset;
 				}
 			} else if (state == ConnectionState.WRITE_ONLY) {
 				// the opposite site just closed the connection
@@ -233,20 +231,21 @@ public final class Socket {
 	}
 
 	private boolean isValid(TcpSegment segment) {
+		boolean result = true;
 		if (segment.length < TcpSegment.TCP_HEADER_LENGTH) {
-			return false;
+			result = false;
 		}
 		
 		if (checksumFor(segment) != 0) {
-			return false;
+			result = false;
 		}
 		
-		return true;
+		return result;
 	}
 
 	private Packet packetFrom(TcpSegment segment) {
-		packet.source = Bits.reverseOrder(localAddress);
-		packet.destination = Bits.reverseOrder(remoteAddress);
+		packet.source = Integer.reverseBytes(localAddress);
+		packet.destination = Integer.reverseBytes(remoteAddress);
 		packet.protocol = IP.TCP_PROTOCOL;
 		packet.id = 1;
 		packet.data = segment.toByteArray();
@@ -383,5 +382,5 @@ public final class Socket {
 	
 	private Packet packet = new Packet();
 	
-	private TcpSegment segment;
+	private TcpSegment segment = new TcpSegment();
 }
