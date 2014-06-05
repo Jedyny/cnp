@@ -34,8 +34,8 @@ import java.nio.ByteBuffer;
 		return buffer.getInt(ACK_IX);
 	}
 	
-	public void getData(byte[] dst, int offset) {
-		System.arraycopy(buffer.array(), DATA_IX, dst, offset, dataLength);
+	public void getData(byte[] dst, int dstOffset) {
+		System.arraycopy(buffer.array(), DATA_IX, dst, dstOffset, dataLength);
 	}
 	
 	public boolean hasSynFlag() {
@@ -78,8 +78,8 @@ import java.nio.ByteBuffer;
 		buffer.putShort(CHECKSUM_IX, checksum);
 	}
 	
-	public void setData(byte[] src, int offset, int length) {
-		System.arraycopy(src, offset, buffer.array(), DATA_IX, length);
+	public void setData(byte[] src, int srcOffset, int length) {
+		System.arraycopy(src, srcOffset, buffer.array(), DATA_IX, length);
 		this.length = length + TCP_MAX_DATA_LENGTH;
 		this.dataLength = length;
 	}
