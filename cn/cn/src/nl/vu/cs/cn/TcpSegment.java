@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 
 /* package */ final class TcpSegment {
 
-	/* package */ static int TCP_MAX_DATA_LENGTH = 80;
+	/* package */ static int TCP_MAX_DATA_LENGTH = 128;
 	
 	public void fromByteArray(byte[] data, int length) {
 		if (data != buffer.array()) {

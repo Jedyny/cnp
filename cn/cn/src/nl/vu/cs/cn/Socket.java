@@ -364,7 +364,7 @@ public final class Socket {
 		}
 	}
 
-	private IP ip;
+	/* package */ IP ip;
 
 	/* package */ ConnectionState state;
 

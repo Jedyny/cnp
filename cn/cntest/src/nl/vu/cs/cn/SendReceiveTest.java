@@ -44,46 +44,14 @@ public class SendReceiveTest extends TestCase {
 	
 	public void testOneSendWithoutData() {
 		TcpSegment segment = newSegment(sender, 12345, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
-		sender.sendSegment(segment);
-		receiver.receiveSegment(receiver.segment);
-		
-		segment = receiver.segment;
-		assertEquals(segment.getFromPort(), SENDER_PORT);
-		assertEquals(segment.getToPort(), RECEIVER_PORT);
-		assertEquals(segment.getSeq(), sender.localSequenceNumber);
-		assertEquals(segment.getAck(), 12345);
-		assertTrue(segment.hasAckFlag());
-		assertTrue(segment.hasSynFlag());
-		assertTrue(segment.hasPushFlag());
-		assertFalse(segment.hasFinFlag());
-		assertEquals(segment.length, TcpSegment.TCP_HEADER_LENGTH);
-		assertEquals(segment.dataLength, 0);
+		sendAndValidateMessage(sender, receiver, segment, "");
 	}
 	
 	public void testOneSendWithData() {
 		String hamlet = "To be or not to be";
-		byte[] byteHamlet = hamlet.getBytes();
-		byte[] byteOphelia = new byte[byteHamlet.length];
 		
 		TcpSegment segment = newSegment(sender, 12345, (byte) (PUSH_FLAG));
-		segment.setData(byteHamlet, 0, byteHamlet.length);
-		sender.sendSegment(segment);
-		receiver.receiveSegment(receiver.segment);
-		
-		segment = receiver.segment;
-		assertEquals(segment.getFromPort(), SENDER_PORT);
-		assertEquals(segment.getToPort(), RECEIVER_PORT);
-		assertEquals(segment.getSeq(), sender.localSequenceNumber);
-		assertEquals(segment.getAck(), 12345);
-		assertFalse(segment.hasAckFlag());
-		assertFalse(segment.hasSynFlag());
-		assertTrue(segment.hasPushFlag());
-		assertFalse(segment.hasFinFlag());
-		assertEquals(segment.length, TcpSegment.TCP_HEADER_LENGTH + byteHamlet.length);
-		assertEquals(segment.dataLength, byteHamlet.length);
-		
-		segment.getData(byteOphelia, 0);
-		assertEquals(new String(byteOphelia), hamlet);
+		sendAndValidateMessage(sender, receiver, segment, hamlet);
 	}
 	
 	public void testFewSendsWithData() {
@@ -92,43 +60,65 @@ public class SendReceiveTest extends TestCase {
 		String witch2 = "When the hurlyburly's done. " +
 				"When the battle's lost and won.";
 		String witch3 = "That will be ere the set of sun.";
-		byte[] byteWitch1 = witch1.getBytes();
-		byte[] byteWitch2 = witch2.getBytes();
-		byte[] byteWitch3 = witch3.getBytes();
-		
-		byte[] receiverWitch1 = new byte[byteWitch1.length];
-		byte[] receiverWitch2 = new byte[byteWitch2.length];
-		byte[] receiverWitch3 = new byte[byteWitch3.length];
 		
 		TcpSegment segment = newSegment(sender, 0, (byte) (PUSH_FLAG));
-		segment.setData(byteWitch1, 0, byteWitch1.length);
-		sender.sendSegment(segment);
-		receiver.receiveSegment(receiver.segment);
-		segment = receiver.segment;
-		assertEquals(segment.length, TcpSegment.TCP_HEADER_LENGTH + byteWitch1.length);
-		assertEquals(segment.dataLength, byteWitch1.length);
-		segment.getData(receiverWitch1, 0);
-		assertEquals(new String(receiverWitch1), witch1);
+		sendAndValidateMessage(sender, receiver, segment, witch1);
 		
 		segment = newSegment(sender, 0, (byte) (PUSH_FLAG));
-		segment.setData(byteWitch2, 0, byteWitch2.length);
-		sender.sendSegment(segment);
-		receiver.receiveSegment(receiver.segment);
-		segment = receiver.segment;
-		assertEquals(segment.length, TcpSegment.TCP_HEADER_LENGTH + byteWitch2.length);
-		assertEquals(segment.dataLength, byteWitch2.length);
-		segment.getData(receiverWitch2, 0);
-		assertEquals(new String(receiverWitch2), witch2);
+		sendAndValidateMessage(sender, receiver, segment, witch2);
 		
 		segment = newSegment(sender, 0, (byte) (PUSH_FLAG));
-		segment.setData(byteWitch3, 0, byteWitch3.length);
+		sendAndValidateMessage(sender, receiver, segment, witch3);
+	}
+	
+	public void testMessagesExchange() {
+		String romeo1 = "My lips, two blushing pilgrims, ready stand" +
+				"To smooth that rough touch with a tender kiss.";
+		String juliet1 = "Saints have hands that pilgrims' hands do touch," +
+				"And palm to palm is holy palmers' kiss.";
+		String romeo2 = "Have not saints lips, and holy palmers too?";
+		String juliet2 = "Ay, pilgrim, lips that they must use in prayer.";
+		String romeo3 = "O, then, dear saint, let lips do what hands do;" +
+				"Thus from my lips, by yours, my sin is purged.";
+		
+		TcpSegment segment = newSegment(sender, 0, (byte) (PUSH_FLAG));
+		sendAndValidateMessage(sender, receiver, segment, romeo1);
+		
+		segment = newSegment(receiver, 100, (byte) (ACK_FLAG | PUSH_FLAG));
+		sendAndValidateMessage(receiver, sender, segment, juliet1);
+		
+		segment = newSegment(sender, 200, (byte) (ACK_FLAG | PUSH_FLAG));
+		sendAndValidateMessage(sender, receiver, segment, romeo2);
+		
+		segment = newSegment(receiver, 101, (byte) (ACK_FLAG | PUSH_FLAG));
+		sendAndValidateMessage(receiver, sender, segment, juliet2);
+		
+		segment = newSegment(sender, 201, (byte) (ACK_FLAG | PUSH_FLAG));
+		sendAndValidateMessage(sender, receiver, segment, romeo3);
+	}
+	
+	private void sendAndValidateMessage(Socket sender, Socket receiver, TcpSegment segment, String message) {
+		byte[] data = message.getBytes();
+		segment.setData(data, 0, data.length);
 		sender.sendSegment(segment);
+		
 		receiver.receiveSegment(receiver.segment);
-		segment = receiver.segment;
-		assertEquals(segment.length, TcpSegment.TCP_HEADER_LENGTH + byteWitch3.length);
-		assertEquals(segment.dataLength, byteWitch3.length);
-		segment.getData(receiverWitch3, 0);
-		assertEquals(new String(receiverWitch3), witch3);
+		TcpSegment receivedSegment = receiver.segment;
+		
+		assertEquals(receivedSegment.getFromPort(), sender.localPort);
+		assertEquals(receivedSegment.getToPort(), receiver.localPort);
+		assertEquals(receivedSegment.getSeq(), sender.localSequenceNumber);
+		assertEquals(receivedSegment.getAck(), segment.getAck());
+		assertEquals(receivedSegment.hasAckFlag(), segment.hasAckFlag());
+		assertEquals(receivedSegment.hasSynFlag(), segment.hasSynFlag());
+		assertEquals(receivedSegment.hasPushFlag(), segment.hasPushFlag());
+		assertEquals(receivedSegment.hasFinFlag(), segment.hasFinFlag());
+		assertEquals(receivedSegment.length, TcpSegment.TCP_HEADER_LENGTH + data.length);
+		assertEquals(receivedSegment.dataLength, data.length);
+		
+		byte[] receivedData = new byte[data.length];
+		receivedSegment.getData(receivedData, 0);
+		assertEquals(new String(receivedData), message);
 	}
 	
 	private TcpSegment newSegment(Socket socket, int ack,
