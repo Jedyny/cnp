@@ -59,6 +59,7 @@ import java.nio.ByteBuffer;
 	}
 	
 	public void setSeq(int seq) {
+	
 		buffer.putInt(SEQ_IX, seq);
 	}
 	

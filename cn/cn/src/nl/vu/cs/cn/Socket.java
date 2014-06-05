@@ -14,6 +14,9 @@ import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.IP.Packet;
 import nl.vu.cs.cn.util.Bits;
 
+import static nl.vu.cs.cn.util.Preconditions.checkNotNull;
+import static nl.vu.cs.cn.util.Preconditions.checkState;
+
 /**
  * This class represents a TCP socket.
  * 
@@ -24,7 +27,10 @@ public final class Socket {
 	 * Construct a client socket.
 	 */
 	/* package */Socket(IP ip) {
-		// TODO: Method stub.
+		this.ip = ip;
+		int ipaddress = ip.getLocalAddress().getAddress();
+		localAddress=Bits.reverseOrder(ipaddress); 
+		
 	}
 
 	/**
@@ -34,7 +40,10 @@ public final class Socket {
 	 *            the local port to use
 	 */
 	/* package */Socket(IP ip, int port) {
-		// TODO: Method stub.
+		this.ip = ip;
+		int ipaddress = ip.getLocalAddress().getAddress();
+		localAddress = Bits.reverseOrder(ipaddress); 
+		localPort = (short)port;
 	}
 
 	/**
@@ -362,8 +371,7 @@ public final class Socket {
 	private ConnectionState state;
 
 	private int localAddress; // in big-endian
-
-	private int remoteAddress; // in big-endian
+	/*package*/ int remoteAddress; // n big-endian
 
 	private short localPort;
 
@@ -372,8 +380,8 @@ public final class Socket {
 	private int localSequenceNumber;
 
 	private int remoteSequenceNumber;
-
+	
 	private Packet packet = new Packet();
-
+	
 	private TcpSegment segment;
 }
