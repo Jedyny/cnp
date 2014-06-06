@@ -192,10 +192,6 @@ public final class Socket {
 		return true;
 	}
 
-	private void onFinReceived() {
-
-	}
-
 	// package to simplify testing
 	/* package */short checksumFor(TcpSegment segment) {
 		long sum = 0;
@@ -286,6 +282,7 @@ public final class Socket {
 	
 	private boolean sendDataSegment(TcpSegment segment, byte[] src, int offset, int len) {
 		fillBasicSegmentData(segment);
+		segment.setFlags((byte) (PUSH_FLAG));
 		segment.setData(src, offset, len);
 		return sendSegment(segment);
 	}
@@ -320,6 +317,10 @@ public final class Socket {
 	private boolean receiveAckSegment(TcpSegment segment) {
 		do {
 			receiveSegment(segment);
+			if (isValidFin(segment)) {
+				onFinReceived();
+				return false;
+			}
 		} while (segment.getFromPort() != remotePort 
 				|| segment.hasSynFlag()
 				|| !segment.hasAckFlag() 
@@ -342,12 +343,32 @@ public final class Socket {
 	private boolean receiveDataSegment(TcpSegment segment, byte[] dst, int offset) {
 		do { 
 			receiveSegment(segment);
+			if (isValidFin(segment)) {
+				onFinReceived();
+				return false;
+			}
 		} while (segment.getFromPort() != remotePort
 		 		|| segment.hasAckFlag()
 		 		|| segment.hasSynFlag()
 		 		|| segment.hasFinFlag()
 		 		|| segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber  >= 0);
 		return true;
+	}
+	
+	private boolean isValidFin(TcpSegment segment) {
+		return segment.getFromPort() == remotePort
+				&& !segment.hasAckFlag()
+				&& !segment.hasSynFlag()
+				&& segment.hasFinFlag();
+	}
+	
+	private void onFinReceived() {
+		sendAckSegment(segment);
+		if (state == ConnectionState.ESTABLISHED) {
+			state = ConnectionState.WRITE_ONLY;
+		} else if (state == ConnectionState.READ_ONLY) {
+			state = ConnectionState.CLOSED;
+		}
 	}
 	// @formatter:on
 
