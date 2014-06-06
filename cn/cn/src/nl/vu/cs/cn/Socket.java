@@ -122,6 +122,7 @@ public final class Socket {
 			if (receiveDataSegment(segment, buf, currentOffset)) {
 				currentOffset += segment.dataLength + segment.getSeq() - 1 - remoteSequenceNumber;  
 				
+				remoteSequenceNumber += segment.dataLength;
 				if (!sendAckSegment(segment)) {
 					return currentOffset - offset;
 				}
@@ -154,7 +155,6 @@ public final class Socket {
 		int currOffset = offset;
 		while (dataLeft > 0) {
 			int dataLength = Math.min(dataLeft, TcpSegment.TCP_MAX_DATA_LENGTH);
-			dataLeft -= dataLength;
 			
 			if (!sendDataSegment(segment, buf, currOffset, dataLength)) {
 				return -1;
@@ -284,6 +284,7 @@ public final class Socket {
 		fillBasicSegmentData(segment);
 		segment.setFlags((byte) (PUSH_FLAG));
 		segment.setData(src, offset, len);
+		segment.setFlags((byte) PUSH_FLAG);
 		return sendSegment(segment);
 	}
 	
@@ -343,15 +344,17 @@ public final class Socket {
 	private boolean receiveDataSegment(TcpSegment segment, byte[] dst, int offset) {
 		do { 
 			receiveSegment(segment);
+			
 			if (isValidFin(segment)) {
 				onFinReceived();
 				return false;
 			}
+			segment.getData(dst, offset);
 		} while (segment.getFromPort() != remotePort
 		 		|| segment.hasAckFlag()
 		 		|| segment.hasSynFlag()
 		 		|| segment.hasFinFlag()
-		 		|| segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber  >= 0);
+		 		|| segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber  < 0);
 		return true;
 	}
 	
@@ -378,6 +381,7 @@ public final class Socket {
 			do {
 				ip.ip_receive(packet);
 				segment = segmentFrom(packet);
+				int lala=5;
 				if (remoteAddress == 0) {
 					remoteAddress = Integer.reverseBytes(packet.source);
 				}
