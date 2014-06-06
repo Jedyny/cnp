@@ -23,23 +23,16 @@ import static nl.vu.cs.cn.util.Preconditions.checkState;
 public final class Socket {
 	
 	/**
-	 * Construct a client socket.
-	 */
-	/* package */Socket(IP ip) {
-		this.ip = ip;
-		int ipaddress = ip.getLocalAddress().getAddress();
-		localAddress=Integer.reverseBytes(ipaddress); 
-		packet.data = new byte[TcpSegment.TCP_HEADER_LENGTH + TcpSegment.TCP_MAX_DATA_LENGTH];
-	}
-
-	/**
-	 * Construct a server socket bound to the given local port.
+	 * Construct a socket bound to the given local port.
 	 * 
 	 * @param port
 	 *            the local port to use
 	 */
-	/* package */Socket(IP ip, int port) {
-		this(ip);
+	/* package */ Socket(IP ip, short port) {
+		this.ip = ip;
+		int localAddressLittleEndian = ip.getLocalAddress().getAddress();
+		localAddress = Integer.reverseBytes(localAddressLittleEndian); 
+		packet.data = new byte[TcpSegment.TCP_HEADER_LENGTH + TcpSegment.TCP_MAX_DATA_LENGTH];
 		localPort = (short) port;
 	}
 
@@ -69,6 +62,7 @@ public final class Socket {
 		}
 
 		remoteSequenceNumber = segment.getSeq();
+		++localSequenceNumber;
 		if (!sendAckSegment(segment)) {
 			return false;
 		}
@@ -97,10 +91,10 @@ public final class Socket {
 				continue;
 			}
 
-			++localSequenceNumber;
 			if (!receiveAckSegment(segment)) {
 				continue;
 			}
+			++localSequenceNumber;
 			break;
 		}
 
@@ -222,7 +216,9 @@ public final class Socket {
 		}
 
 		// remainder
-		sum += (sum >>> 16);
+		while (sum > 65535) {
+			sum = (sum >>> 16) + (sum & 0xffff);
+		}
 
 		// one's complement
 		sum = ~sum & 0xffff;
@@ -235,7 +231,8 @@ public final class Socket {
 			result = false;
 		}
 		
-		if (checksumFor(segment) != 0) {
+		short checksum = checksumFor(segment);
+		if (checksum != 0) {
 			result = false;
 		}
 		
@@ -261,7 +258,10 @@ public final class Socket {
 		segment.setFromPort(localPort);
 		segment.setToPort(remotePort);
 		segment.setSeq(localSequenceNumber);
+		segment.setChecksum((short) 0); // clear it
 		segment.setWindowSize((short) 1);
+		segment.length = TcpSegment.TCP_HEADER_LENGTH; // clear data
+		segment.dataLength = 0;
 	}
 
 	private boolean sendSynSegment(TcpSegment segment) {
@@ -357,6 +357,9 @@ public final class Socket {
 			do {
 				ip.ip_receive(packet);
 				segment = segmentFrom(packet);
+				if (remoteAddress == 0) {
+					remoteAddress = Integer.reverseBytes(packet.source);
+				}
 			} while (!isValid(segment));
 			return true;
 		} catch (IOException e) {
@@ -366,7 +369,7 @@ public final class Socket {
 
 	/* package */ IP ip;
 
-	/* package */ ConnectionState state;
+	/* package */ ConnectionState state = ConnectionState.CLOSED;
 
 	/* package */ int localAddress; // in big-endian
 	

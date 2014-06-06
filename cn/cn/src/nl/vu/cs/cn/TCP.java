@@ -2,6 +2,8 @@ package nl.vu.cs.cn;
 
 import java.io.IOException;
 
+import static nl.vu.cs.cn.util.Preconditions.checkArgument;
+
 /**
  * This class represents a TCP stack. It should be built on top of the IP stack
  * which is bound to a given IP address.
@@ -10,6 +12,8 @@ public class TCP {
 
 	/** The underlying IP stack for this TCP stack. */
 	private IP ip;
+	
+	private static short DEFAULT_PORT = 1453;
 	
 	/**
 	 * Constructs a TCP stack for the given virtual address. The virtual address
@@ -28,7 +32,7 @@ public class TCP {
 	 * @return a new socket for this stack
 	 */
 	public Socket socket() {
-		return new Socket(ip);
+		return new Socket(ip, DEFAULT_PORT);
 	}
 
 	/**
@@ -37,7 +41,8 @@ public class TCP {
 	 *            the port to bind the socket to.
 	 */
 	public Socket socket(int port) {
-		return new Socket(ip, port);
+		checkArgument(0 < port && port <= 65545);
+		return new Socket(ip, (short) port);
 	}
 	
 	/* package */ static int getInitSequenceNumber() {
