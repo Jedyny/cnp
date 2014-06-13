@@ -46,6 +46,13 @@ import java.nio.ByteBuffer;
 		System.arraycopy(buffer.array(), DATA_IX, dst, dstOffset, dataLength);
 	}
 	
+	public boolean hasFlags(int allOfMask, int noneOfMask) {
+		int flags = buffer.get(FLAGS_IX);
+		
+		return (flags & allOfMask) == allOfMask 
+				&& (flags | ~noneOfMask) == ~noneOfMask;
+	}
+	
 	public boolean hasSynFlag() {
 		return (buffer.get(FLAGS_IX) & SYN_FLAG) != 0;
 	}
