@@ -21,18 +21,21 @@ import static nl.vu.cs.cn.util.Preconditions.checkState;
  * 
  */
 public final class Socket {
-	
+
 	/**
 	 * Construct a socket bound to the given local port.
 	 * 
 	 * @param port
 	 *            the local port to use
 	 */
-	/* package */ Socket(IP ip, short port) {
+	/* package */Socket(IP ip, short port) {
 		this.ip = ip;
 		int localAddressLittleEndian = ip.getLocalAddress().getAddress();
-		localAddress = Integer.reverseBytes(localAddressLittleEndian); 
-		packet.data = new byte[TcpSegment.TCP_HEADER_LENGTH + TcpSegment.TCP_MAX_DATA_LENGTH];
+		localAddress = Integer.reverseBytes(localAddressLittleEndian);
+		sentPacket.data = new byte[TcpSegment.TCP_HEADER_LENGTH
+				+ TcpSegment.TCP_MAX_DATA_LENGTH];
+		receivedPacket.data = new byte[TcpSegment.TCP_HEADER_LENGTH
+				+ TcpSegment.TCP_MAX_DATA_LENGTH];
 		localPort = (short) port;
 	}
 
@@ -53,17 +56,11 @@ public final class Socket {
 		localSequenceNumber = TCP.getInitSequenceNumber();
 		remoteAddress = Integer.reverseBytes(dst.getAddress());
 		remotePort = (short) port;
-		if (!sendSynSegment(segment)) {
-			return false;
-		}
+		deliverSynSegment();
 
-		if (!receiveSynAckSegment(segment)) {
-			return false;
-		}
-
-		remoteSequenceNumber = segment.getSeq();
+		remoteSequenceNumber = receivedSegment.getSeq();
 		++localSequenceNumber;
-		if (!sendAckSegment(segment)) {
+		if (!sendAckSegment(sentSegment)) {
 			return false;
 		}
 
@@ -82,20 +79,16 @@ public final class Socket {
 		checkState(state == ConnectionState.CLOSED);
 
 		for (;;) {
-			receiveSynSegment(segment);
+			receiveSynSegment(receivedSegment);
 
 			localSequenceNumber = TCP.getInitSequenceNumber();
-			remotePort = segment.getFromPort();
-			remoteSequenceNumber = segment.getSeq();
-			if (!sendSynAckSegment(segment)) {
-				continue;
-			}
+			remotePort = receivedSegment.getFromPort();
+			remoteSequenceNumber = receivedSegment.getSeq();
 
-			if (!receiveAckSegment(segment)) {
-				continue;
+			if (deliverSynAckSegment()) {
+				++localSequenceNumber;
+				break;
 			}
-			++localSequenceNumber;
-			break;
 		}
 
 		state = ConnectionState.ESTABLISHED;
@@ -115,15 +108,17 @@ public final class Socket {
 	 */
 	public int read(byte[] buf, int offset, int maxlen) {
 		checkNotNull(buf);
-		checkState(state == ConnectionState.ESTABLISHED || state == ConnectionState.READ_ONLY);
+		checkState(state == ConnectionState.ESTABLISHED
+				|| state == ConnectionState.READ_ONLY);
 
 		int currentOffset = offset;
-		while (currentOffset - offset < maxlen) { 
-			if (receiveDataSegment(segment, buf, currentOffset)) {
-				currentOffset += segment.dataLength + segment.getSeq() - 1 - remoteSequenceNumber;  
-				
-				remoteSequenceNumber += segment.dataLength;
-				if (!sendAckSegment(segment)) {
+		while (currentOffset - offset < maxlen) {
+			if (receiveDataSegment(receivedSegment, buf, currentOffset)) {
+				currentOffset += receivedSegment.dataLength
+						+ receivedSegment.getSeq() - 1 - remoteSequenceNumber;
+
+				remoteSequenceNumber += receivedSegment.dataLength;
+				if (!sendAckSegment(receivedSegment)) {
 					return currentOffset - offset;
 				}
 			} else if (state == ConnectionState.WRITE_ONLY) {
@@ -149,25 +144,23 @@ public final class Socket {
 	 */
 	public int write(byte[] buf, int offset, int len) {
 		checkNotNull(buf);
-		checkState(state == ConnectionState.ESTABLISHED || state == ConnectionState.WRITE_ONLY);
+		checkState(state == ConnectionState.ESTABLISHED
+				|| state == ConnectionState.WRITE_ONLY);
 
 		int dataLeft = len;
 		int currOffset = offset;
 		while (dataLeft > 0) {
 			int dataLength = Math.min(dataLeft, TcpSegment.TCP_MAX_DATA_LENGTH);
-			
-			if (!sendDataSegment(segment, buf, currOffset, dataLength)) {
-				return -1;
+
+			int ack = deliverDataSegment(buf, currOffset, dataLength);
+			if (ack == -1) {
+				return len - dataLeft;
 			}
-			
-			if (!receiveAckSegment(segment)) {
-				return -1;
-			}
-			
-			int acknowledged = segment.getAck() - localSequenceNumber;
+
+			int acknowledged = ack - localSequenceNumber;
 			currOffset += acknowledged;
 			dataLeft -= acknowledged;
-			localSequenceNumber = segment.getAck();
+			localSequenceNumber = ack;
 		}
 		return len;
 	}
@@ -183,12 +176,8 @@ public final class Socket {
 			return false;
 		}
 
-		if (!sendFinSegment(segment)) {
-			return false;
-		}
+		deliverFinSegment();
 
-		// we closed the connection and we do not care if we receive it or not
-		receiveAckSegment(segment);
 		if (state == ConnectionState.ESTABLISHED) {
 			state = ConnectionState.READ_ONLY;
 		} else if (state == ConnectionState.WRITE_ONLY) {
@@ -231,16 +220,16 @@ public final class Socket {
 		if (segment.length < TcpSegment.TCP_HEADER_LENGTH) {
 			result = false;
 		}
-		
+
 		short checksum = checksumFor(segment);
 		if (checksum != 0) {
 			result = false;
 		}
-		
+
 		return result;
 	}
 
-	private Packet packetFrom(TcpSegment segment) {
+	private Packet packetFrom(Packet packet, TcpSegment segment) {
 		packet.source = Integer.reverseBytes(localAddress);
 		packet.destination = Integer.reverseBytes(remoteAddress);
 		packet.protocol = IP.TCP_PROTOCOL;
@@ -250,7 +239,7 @@ public final class Socket {
 		return packet;
 	}
 
-	private TcpSegment segmentFrom(Packet packet) {
+	private TcpSegment segmentFrom(Packet packet, TcpSegment segment) {
 		segment.fromByteArray(packet.data, packet.length);
 		return segment;
 	}
@@ -265,10 +254,57 @@ public final class Socket {
 		segment.dataLength = 0;
 	}
 
-	private boolean sendSynSegment(TcpSegment segment) {
-		fillBasicSegmentData(segment);
-		segment.setFlags((byte) (SYN_FLAG | PUSH_FLAG));
-		return sendSegment(segment);
+	private boolean deliverSynSegment() {
+		fillBasicSegmentData(sentSegment);
+		sentSegment.setFlags((byte) (SYN_FLAG | PUSH_FLAG));
+		return deliverSegment(sentSegment, true) != -1;
+	}
+
+	private boolean deliverSynAckSegment() {
+		fillBasicSegmentData(sentSegment);
+		sentSegment.setAck(remoteSequenceNumber + 1);
+		sentSegment.setFlags((byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
+		return deliverSegment(sentSegment) != -1;
+	}
+
+	private int deliverDataSegment(byte[] src, int offset, int len) {
+		fillBasicSegmentData(sentSegment);
+		sentSegment.setData(src, offset, len);
+		sentSegment.setFlags((byte) PUSH_FLAG);
+		return deliverSegment(sentSegment);
+	}
+
+	private boolean deliverFinSegment() {
+		fillBasicSegmentData(sentSegment);
+		sentSegment.setFlags((byte) (FIN_FLAG | PUSH_FLAG));
+		return deliverSegment(sentSegment) != -1;
+	}
+
+	/* returns last acked byte or -1 in case of failure */
+	private int deliverSegment(TcpSegment segment) {
+		return deliverSegment(segment, false);
+	}
+
+	private int deliverSegment(TcpSegment segment, boolean maybeSynAck) {
+		int ackOffset;
+		if (segment.hasSynFlag() | segment.hasFinFlag()) {
+			ackOffset = 1;
+		} else {
+			ackOffset = segment.dataLength;
+		}
+		int trialsLeft = TCP.MAX_RESEND_TRIALS;
+		for (; trialsLeft > 0; --trialsLeft) {
+			if (!sendSegment(segment)) {
+				continue;
+			}
+
+			if (receiveAckSegment(receivedSegment, localSequenceNumber,
+					ackOffset, maybeSynAck)) {
+				break;
+			}
+		}
+
+		return (trialsLeft > 0 ? receivedSegment.getAck() : -1);
 	}
 
 	private boolean sendAckSegment(TcpSegment segment) {
@@ -278,49 +314,11 @@ public final class Socket {
 		return sendSegment(segment);
 	}
 
-	private boolean sendSynAckSegment(TcpSegment segment) {
-		fillBasicSegmentData(segment);
-		segment.setAck(remoteSequenceNumber + 1);
-		segment.setFlags((byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
-		return sendSegment(segment);
-	}
-	
-	private boolean sendDataSegment(TcpSegment segment, byte[] src, int offset, int len) {
-		fillBasicSegmentData(segment);
-		segment.setFlags((byte) (PUSH_FLAG));
-		segment.setData(src, offset, len);
-		segment.setFlags((byte) PUSH_FLAG);
-		return sendSegment(segment);
-	}
-	
-	private boolean sendFinSegment(TcpSegment segment) {
-		fillBasicSegmentData(segment);
-		segment.setFlags((byte) (FIN_FLAG | PUSH_FLAG));
-		return sendSegment(segment);
-	}
-	
-	/* returns last acked byte or -1 in case of failure */
-	private int sendAndWaitForAck(TcpSegment segment) {
-		int ackOffset = segment.dataLength;
-		int trialsLeft = TCP.MAX_RESEND_TRIALS;
-		for (; trialsLeft > 0; --trialsLeft) {
-			if (!sendSegment(segment)) {
-				continue;
-			}
-			
-			if (_receiveAckSegment(ackSegment, localSequenceNumber, ackOffset)) {
-				break;
-			}
-		}
-		
-		return (trialsLeft > 0 ? segment.getAck() : -1);
-	}
-
 	// package to simplify testing
 	/* package */boolean sendSegment(TcpSegment segment) {
 		try {
 			segment.setChecksum(checksumFor(segment));
-			ip.ip_send(packetFrom(segment));
+			ip.ip_send(packetFrom(sentPacket, segment));
 			return true;
 		} catch (IOException e) {
 			return false;
@@ -335,64 +333,61 @@ public final class Socket {
 		return true;
 	}
 	
-	private boolean receiveAckSegment(TcpSegment segment) {
-		do {
-			receiveSegment(segment);
-			if (isValidFin(segment)) {
-				onFinReceived();
-				return false;
-			}
-		} while (segment.getFromPort() != remotePort 
-				|| !segment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG)
-				|| segment.getAck() < localSequenceNumber + 1);
-		return true;
-	}
-	
-	private boolean _receiveAckSegment(TcpSegment segment, int ackLowerBound, int ackOffset) {
-		do {
-			receiveSegment(segment);
-			if (isValidFin(segment)) {
-				onFinReceived();
-				return false;
-			}
-		} while (segment.getFromPort() != remotePort 
-				|| !segment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG)
-				|| segment.getAck() < ackLowerBound
-				|| segment.getAck() > ackLowerBound + ackOffset);
-		return true;
-	}
-	
-	private boolean receiveSynAckSegment(TcpSegment segment) {
-		do {
-			receiveSegment(segment);
-		} while (segment.getFromPort() != remotePort
-				|| !segment.hasFlags(SYN_FLAG | ACK_FLAG, FIN_FLAG)
-				|| segment.getAck() != localSequenceNumber + 1);
-		return true;
+	private boolean receiveAckSegment(TcpSegment segment, int ackLowerBound, int ackOffset, boolean actuallySynAck) {
+		int allOf, noneOf;
+		allOf = (actuallySynAck ? ACK_FLAG | SYN_FLAG : ACK_FLAG);
+		noneOf= (actuallySynAck ? FIN_FLAG : SYN_FLAG | FIN_FLAG);
+			
+		if (!receiveSegmentWithTimeout(segment, TCP.RECV_WAIT_TIMEOUT_SECONDS)) {
+			return false;
+		} else if (isValidFin(segment)) {
+			onFinReceived();
+			return false;
+		} else {
+			return segment.getFromPort() == remotePort 
+				&& segment.hasFlags(allOf, noneOf)
+				&& segment.getAck() >= ackLowerBound
+				&& segment.getAck() <= ackLowerBound + ackOffset;
+		}
 	}
 	
 	private boolean receiveDataSegment(TcpSegment segment, byte[] dst, int offset) {
-		do { 
-			receiveSegment(segment);
-			
-			if (isValidFin(segment)) {
-				onFinReceived();
-				return false;
-			}
+		if (!receiveSegmentWithTimeout(segment, TCP.RECV_WAIT_TIMEOUT_SECONDS)) {
+			return false;
+		} else if (isValidFin(segment)) {
+			onFinReceived();
+			return false;
+		} else if (!remoteEstablished && isValidDelayedSynAck(segment)) {
+			onDelayedSynAckReceived();
+			return false;
+		} else if (segment.getFromPort() == remotePort
+			&& segment.hasFlags(0, SYN_FLAG | ACK_FLAG | FIN_FLAG)
+	 		&& segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber >= 0) {
 			segment.getData(dst, offset);
-		} while (segment.getFromPort() != remotePort
-				|| !segment.hasFlags(0, SYN_FLAG | ACK_FLAG | FIN_FLAG)
-		 		|| segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber  < 0);
-		return true;
+			remoteEstablished = true;
+			return true;
+		} else {
+			return false;
+		}
 	}
 	
+	private boolean isValidDelayedSynAck(TcpSegment segment) {
+		return segment.getFromPort() == remotePort
+				&& segment.hasFlags(SYN_FLAG | ACK_FLAG, FIN_FLAG)
+				&& segment.getAck() == localSequenceNumber;
+	}
+
 	private boolean isValidFin(TcpSegment segment) {
 		return segment.getFromPort() == remotePort
 				&& segment.hasFlags(FIN_FLAG, SYN_FLAG | ACK_FLAG);
 	}
 	
+	private void onDelayedSynAckReceived() {
+		sendAckSegment(receivedSegment);
+	}
+	
 	private void onFinReceived() {
-		sendAckSegment(segment);
+		sendAckSegment(receivedSegment);
 		if (state == ConnectionState.ESTABLISHED) {
 			state = ConnectionState.WRITE_ONLY;
 		} else if (state == ConnectionState.READ_ONLY) {
@@ -405,43 +400,46 @@ public final class Socket {
 	/* package */boolean receiveSegment(TcpSegment segment) {
 		return receiveSegmentWithTimeout(segment, 0);
 	}
-	
-	/* package */boolean receiveSegmentWithTimeout(TcpSegment segment, int timeoutSeconds) {
+
+	/* package */boolean receiveSegmentWithTimeout(TcpSegment segment,
+			int timeoutSeconds) {
 		try {
-			do {
-				ip.ip_receive_timeout(packet, timeoutSeconds);
-				segment = segmentFrom(packet);
-				if (remoteAddress == 0) {
-					remoteAddress = Integer.reverseBytes(packet.source);
-				}
-			} while (!isValid(segment));
-			return true;
+			ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
+			segment = segmentFrom(receivedPacket, segment);
+			if (remoteAddress == 0) {
+				remoteAddress = Integer.reverseBytes(receivedPacket.source);
+			}
+			return isValid(segment);
 		} catch (InterruptedException e) {
 			return false;
-		} catch(IOException e) {
+		} catch (IOException e) {
 			return false;
 		}
 	}
 
-	/* package */ IP ip;
+	/* package */IP ip;
 
-	/* package */ ConnectionState state = ConnectionState.CLOSED;
+	/* package */ConnectionState state = ConnectionState.CLOSED;
 
-	/* package */ int localAddress; // in big-endian
-	
-	/* package */ int remoteAddress; // in big-endian
+	/* package */int localAddress; // in big-endian
 
-	/* package */ short localPort;
+	/* package */int remoteAddress; // in big-endian
 
-	/* package */ short remotePort;
+	/* package */short localPort;
 
-	/* package */ int localSequenceNumber;
+	/* package */short remotePort;
 
-	/* package */ int remoteSequenceNumber;
-	
-	/* package */ Packet packet = new Packet();
-	
-	/* package */ TcpSegment segment = new TcpSegment();
-	
-	/* package */ TcpSegment ackSegment = new TcpSegment();
+	/* package */int localSequenceNumber;
+
+	/* package */int remoteSequenceNumber;
+
+	/* package */Packet sentPacket = new Packet();
+
+	/* package */TcpSegment sentSegment = new TcpSegment();
+
+	/* package */Packet receivedPacket = new Packet();
+
+	/* package */TcpSegment receivedSegment = new TcpSegment();
+
+	/* package */boolean remoteEstablished;
 }

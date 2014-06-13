@@ -102,8 +102,8 @@ public class SendReceiveTest extends TestCase {
 		segment.setData(data, 0, data.length);
 		sender.sendSegment(segment);
 		
-		receiver.receiveSegment(receiver.segment);
-		TcpSegment receivedSegment = receiver.segment;
+		receiver.receiveSegment(receiver.receivedSegment);
+		TcpSegment receivedSegment = receiver.receivedSegment;
 		
 		assertEquals(receivedSegment.getFromPort(), sender.localPort);
 		assertEquals(receivedSegment.getToPort(), receiver.localPort);
