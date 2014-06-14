@@ -16,10 +16,8 @@ public class TCP {
 	private static short DEFAULT_PORT = 1453;
 	private static short CURRENT_PORT = DEFAULT_PORT;
 	
-	// /* package */ static int ACK_WAIT_TIMEOUT_SECONDS = 1;
+	/* package */ static int RECV_WAIT_TIMEOUT_SECONDS = 1;
 	/* package */ static int MAX_RESEND_TRIALS = 10;
-	
-	/* debug */ static int RECV_WAIT_TIMEOUT_SECONDS = 100;
 	
 	/**
 	 * Constructs a TCP stack for the given virtual address. The virtual address
