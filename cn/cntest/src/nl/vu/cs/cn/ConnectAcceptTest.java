@@ -41,12 +41,12 @@ public class ConnectAcceptTest extends TestCase {
 		assertEquals(client.state, ConnectionState.ESTABLISHED);
 		assertEquals(client.remoteAddress, server.localAddress);
 		assertEquals(client.remotePort, server.localPort);
-		assertEquals(client.remoteSequenceNumber + 1, server.localSequenceNumber);
+		assertEquals(client.remoteSequenceNumber, server.localSequenceNumber);
 		
 		assertEquals(server.state, ConnectionState.ESTABLISHED);
 		assertEquals(server.remoteAddress, client.localAddress);
 		assertEquals(server.remotePort, client.localPort);
-		assertEquals(server.remoteSequenceNumber + 1, client.localSequenceNumber);
+		assertEquals(server.remoteSequenceNumber, client.localSequenceNumber);
 	}
 	
 	public void testConnectionTryToNonexistentHost() throws IOException {

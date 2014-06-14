@@ -120,7 +120,7 @@ import java.nio.ByteBuffer;
 		builder.append("push_flag = ").append(hasPushFlag()).append("; ");
 		builder.append("window_size = ").append(getWindow()).append("; ");
 		builder.append("checksum = ").append(getChecksum()).append("; ");
-		builder.append("data = \"").append(new String(data)).append("\"; ");
+		builder.append("data = \"").append(new String(data)).append("\"];");
 		
 		return builder.toString();
 	}
