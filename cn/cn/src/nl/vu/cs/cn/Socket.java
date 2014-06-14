@@ -409,6 +409,9 @@ public final class Socket {
 			int timeoutSeconds) {
 		try {
 			ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
+			if (receivedPacket.protocol != IP.TCP_PROTOCOL) {
+				return false;
+			}
 			segment = segmentFrom(receivedPacket, segment);
 			if (remoteAddress == 0) {
 				remoteAddress = Integer.reverseBytes(receivedPacket.source);
