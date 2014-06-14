@@ -124,7 +124,7 @@ public final class Socket {
 					return currentOffset - offset;
 				}
 				trials = TCP.MAX_RESEND_TRIALS;
-			} else if (state == ConnectionState.WRITE_ONLY) {
+			} else if (state == ConnectionState.WRITE_ONLY || state == ConnectionState.CLOSED) {
 				// the opposite site just closed the connection
 				break;
 			} else if (--trials > 0) {
@@ -422,7 +422,8 @@ public final class Socket {
 		try {
 
 			ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
-			if (receivedPacket.protocol != IP.TCP_PROTOCOL) {
+			if (receivedPacket.protocol != IP.TCP_PROTOCOL
+				&& (remoteAddress == 0 || (Integer.reverseBytes(remoteAddress) == receivedPacket.source))) {
 				return false;
 			}
 			segment = segmentFrom(receivedPacket, segment);

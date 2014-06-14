@@ -37,8 +37,8 @@ public class ClosedConnectionTest extends TestCase {
 		sender.localSequenceNumber = TCP.getInitSequenceNumber();
 		receiver.localSequenceNumber = TCP.getInitSequenceNumber();
 	
-		sender.remoteSequenceNumber = receiver.localSequenceNumber - 1;
-		receiver.remoteSequenceNumber = sender.localSequenceNumber - 1;
+		sender.remoteSequenceNumber = receiver.localSequenceNumber;
+		receiver.remoteSequenceNumber = sender.localSequenceNumber;
 		
 		sender.remotePort = RECEIVER_PORT;
 		receiver.remotePort = SENDER_PORT;
