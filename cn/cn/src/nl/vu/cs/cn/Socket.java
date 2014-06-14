@@ -184,6 +184,8 @@ public final class Socket {
 			state = ConnectionState.READ_ONLY;
 		} else if (state == ConnectionState.WRITE_ONLY) {
 			state = ConnectionState.CLOSED;
+			remoteAddress = 0;
+			remotePort = 0;
 		}
 		return true;
 	}
@@ -398,6 +400,8 @@ public final class Socket {
 			state = ConnectionState.WRITE_ONLY;
 		} else if (state == ConnectionState.READ_ONLY) {
 			state = ConnectionState.CLOSED;
+			remoteAddress = 0;
+			remotePort = 0;
 		}
 	}
 	// @formatter:on
