@@ -113,6 +113,7 @@ public final class Socket {
 				|| state == ConnectionState.READ_ONLY);
 
 		int currentOffset = offset;
+		int trials = TCP.MAX_RESEND_TRIALS;
 		while (currentOffset - offset < maxlen) {
 			if (receiveDataSegment(receivedSegment, buf, currentOffset)) {
 				currentOffset += receivedSegment.dataLength
@@ -122,9 +123,12 @@ public final class Socket {
 				if (!sendAckSegment(sentSegment, toAcknowledge)) {
 					return currentOffset - offset;
 				}
+				trials = TCP.MAX_RESEND_TRIALS;
 			} else if (state == ConnectionState.WRITE_ONLY) {
 				// the opposite site just closed the connection
 				break;
+			} else if (--trials > 0) {
+				continue;
 			} else {
 				return -1;
 			}
