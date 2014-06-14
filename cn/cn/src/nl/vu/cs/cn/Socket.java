@@ -56,7 +56,9 @@ public final class Socket {
 		localSequenceNumber = TCP.getInitSequenceNumber();
 		remoteAddress = Integer.reverseBytes(dst.getAddress());
 		remotePort = (short) port;
-		deliverSynSegment();
+		if (!deliverSynSegment()) {
+			return false;
+		}
 
 		++localSequenceNumber;
 		if (!sendAckSegment(sentSegment, receivedSegment.getSeq() + 1)) {

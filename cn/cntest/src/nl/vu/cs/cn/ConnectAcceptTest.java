@@ -50,16 +50,16 @@ public class ConnectAcceptTest extends TestCase {
 	}
 	
 	public void testConnectionTryToNonexistentHost() throws IOException {
-		/*Socket client = new TCP(CLIENT_IP).socket();
+		Socket client = new TCP(CLIENT_IP).socket();
 		IpAddress serverAddr = IpAddress.getAddress("192.168.0." + SERVER_IP);
 		boolean isConnected = client.connect(serverAddr, SERVER_PORT);
 		
 		assertFalse(isConnected);
-		assertEquals(client.state, ConnectionState.CLOSED); */
+		assertEquals(client.state, ConnectionState.CLOSED);
 	}
 	
 	public void testConnectionTryToAlreadyBoundHost() throws IOException, InterruptedException {
-		/* final Socket client = new TCP(CLIENT_IP).socket();
+		final Socket client = new TCP(CLIENT_IP).socket();
 		final Socket secondClient = new TCP(CLIENT_2_IP).socket();
 		final Socket server = new TCP(SERVER_IP).socket(SERVER_PORT);
 		final IpAddress serverAddr = IpAddress.getAddress("192.168.0." + SERVER_IP);
@@ -86,14 +86,14 @@ public class ConnectAcceptTest extends TestCase {
 		assertEquals(client.state, ConnectionState.ESTABLISHED);
 		assertEquals(client.remoteAddress, server.localAddress);
 		assertEquals(client.remotePort, server.localPort);
-		assertEquals(client.remoteSequenceNumber + 1, server.localSequenceNumber);
+		assertEquals(client.remoteSequenceNumber, server.localSequenceNumber);
 		
 		assertEquals(server.state, ConnectionState.ESTABLISHED);
 		assertEquals(server.remoteAddress, client.localAddress);
 		assertEquals(server.remotePort, client.localPort);
-		assertEquals(server.remoteSequenceNumber + 1, client.localSequenceNumber);
+		assertEquals(server.remoteSequenceNumber, client.localSequenceNumber);
 		
 		assertEquals(secondClient.state, ConnectionState.CLOSED);
-		assertFalse(isSecondConnected); */
+		assertFalse(isSecondConnected);
 	}
 }
