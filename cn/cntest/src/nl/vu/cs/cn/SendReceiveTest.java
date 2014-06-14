@@ -8,6 +8,7 @@ import static nl.vu.cs.cn.TcpSegment.SYN_FLAG;
 import java.io.IOException;
 
 import nl.vu.cs.cn.IP.IpAddress;
+import nl.vu.cs.cn.IP.Packet;
 import junit.framework.TestCase;
 
 public class SendReceiveTest extends TestCase {
@@ -40,21 +41,22 @@ public class SendReceiveTest extends TestCase {
 		
 		sender.remotePort = RECEIVER_PORT;
 		receiver.remotePort = SENDER_PORT;
+		
 	}
 	
-	public void testOneSendWithoutData() {
+	public void I_testOneSendWithoutData() {
 		TcpSegment segment = newSegment(sender, 12345, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
 		sendAndValidateMessage(sender, receiver, segment, "");
 	}
 	
-	public void testOneSendWithData() {
+	public void I_testOneSendWithData() {
 		String hamlet = "To be or not to be";
 		
 		TcpSegment segment = newSegment(sender, 12345, (byte) (PUSH_FLAG));
 		sendAndValidateMessage(sender, receiver, segment, hamlet);
 	}
 	
-	public void testFewSendsWithData() {
+	public void I_testFewSendsWithData() {
 		String witch1 = "When shall we three meet again? " +
 				"In thunder, lightning or in rain?";
 		String witch2 = "When the hurlyburly's done. " +
@@ -71,7 +73,7 @@ public class SendReceiveTest extends TestCase {
 		sendAndValidateMessage(sender, receiver, segment, witch3);
 	}
 	
-	public void testMessagesExchange() {
+	public void I_testMessagesExchange() {
 		String romeo1 = "My lips, two blushing pilgrims, ready stand" +
 				"To smooth that rough touch with a tender kiss.";
 		String juliet1 = "Saints have hands that pilgrims' hands do touch," +
@@ -96,6 +98,7 @@ public class SendReceiveTest extends TestCase {
 		segment = newSegment(sender, 201, (byte) (ACK_FLAG | PUSH_FLAG));
 		sendAndValidateMessage(sender, receiver, segment, romeo3);
 	}
+	
 	
 	private void sendAndValidateMessage(Socket sender, Socket receiver, TcpSegment segment, String message) {
 		byte[] data = message.getBytes();
@@ -133,4 +136,61 @@ public class SendReceiveTest extends TestCase {
 
 		return segment;
 	}
+	
+	public void testInvalidChecksumSegment() throws IOException{
+		
+		TcpSegment segment = newSegment(sender,0,(byte)(PUSH_FLAG));
+		segment.setChecksum((short)21234);
+		
+		sender.ip.ip_send(sender.packetFrom(sender.sentPacket, segment));
+		boolean check = receiver.receiveSegment(receiver.receivedSegment);
+		
+		assertEquals(check, false);
+		
+	}
+	
+	public void testInvalidProtocolPacket() throws IOException{
+		
+		Packet sentPacket = new Packet();
+		TcpSegment segment = newSegment(sender,0,(byte)(PUSH_FLAG));
+		
+		sentPacket.protocol = IP.UDP_PROTOCOL;
+		sentPacket.destination = Integer.reverseBytes(sender.remoteAddress);
+		sentPacket.source = Integer.reverseBytes(receiver.remoteAddress);
+		sentPacket.id = 1;
+		sentPacket.data = segment.toByteArray();
+		sentPacket.length = segment.length;
+		segment.setChecksum(sender.checksumFor(segment));
+		sender.ip.ip_send(sentPacket);
+		boolean check = receiver.receiveSegment(receiver.receivedSegment);
+		
+		assertEquals(check, false);
+	}
+	
+	public void testEmptyPacket() throws IOException{
+		Packet sentPacket = new Packet();
+		byte [] byteArray = new byte[5];
+		byteArray = "whatever".getBytes();
+		
+		sentPacket.protocol = IP.TCP_PROTOCOL;
+		sentPacket.destination = Integer.reverseBytes(sender.remoteAddress);
+		sentPacket.source = Integer.reverseBytes(receiver.remoteAddress);
+		sentPacket.id = 1;
+		sentPacket.data = byteArray;
+		sentPacket.length = 5;
+		
+		sender.ip.ip_send(sentPacket);
+		boolean check = receiver.receiveSegment(receiver.receivedSegment);
+		
+		assertEquals(check, false);
+	}
+	
+	
+	
+	
+
 }
+
+
+
+

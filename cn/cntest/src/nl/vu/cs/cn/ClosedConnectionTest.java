@@ -3,8 +3,6 @@ package nl.vu.cs.cn;
 import java.io.IOException;
 
 import nl.vu.cs.cn.IP.IpAddress;
-import nl.vu.cs.cn.ReadWritePacketTest.readThread;
-import nl.vu.cs.cn.ReadWritePacketTest.writeThread;
 import junit.framework.TestCase;
 
 public class ClosedConnectionTest extends TestCase {
