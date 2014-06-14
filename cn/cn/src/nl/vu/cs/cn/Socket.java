@@ -175,6 +175,7 @@ public final class Socket {
 			return false;
 		}
 
+
 		deliverFinSegment();
 		++localSequenceNumber;
 
@@ -229,7 +230,7 @@ public final class Socket {
 		return result;
 	}
 
-	private Packet packetFrom(Packet packet, TcpSegment segment) {
+	/*package*/ Packet packetFrom(Packet packet, TcpSegment segment) {
 		packet.source = Integer.reverseBytes(localAddress);
 		packet.destination = Integer.reverseBytes(remoteAddress);
 		packet.protocol = IP.TCP_PROTOCOL;
@@ -330,6 +331,7 @@ public final class Socket {
 	private boolean receiveSynSegment(TcpSegment segment) {
 		do {
 			receiveSegment(segment);
+
 		} while (!segment.hasFlags(SYN_FLAG, ACK_FLAG | FIN_FLAG));
 		return true;
 	}
@@ -408,6 +410,7 @@ public final class Socket {
 	/* package */boolean receiveSegmentWithTimeout(TcpSegment segment,
 			int timeoutSeconds) {
 		try {
+
 			ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
 			if (receivedPacket.protocol != IP.TCP_PROTOCOL) {
 				return false;
