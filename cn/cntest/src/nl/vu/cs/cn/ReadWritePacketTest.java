@@ -64,11 +64,20 @@ public class ReadWritePacketTest extends TestCase {
 		sendData(JABBERWOCKY, 20, 100);
 	}
 	
+	public void testReadLessThanExpected() throws InterruptedException {
+		byte[] jabberbytes = JABBERWOCKY.getBytes();
+		sendData(JABBERWOCKY, jabberbytes.length, jabberbytes.length + 32, jabberbytes.length + 32);
+	}
+	
 	public void sendData(String msg) throws InterruptedException {
-		sendData(msg, msg.getBytes().length, msg.getBytes().length);
+		sendData(msg, msg.getBytes().length, msg.getBytes().length, msg.getBytes().length);
+	}
+	
+	public void sendData(String msg, int writerBufLen, int readerBufLen) throws InterruptedException {
+		sendData(msg, writerBufLen, readerBufLen, msg.getBytes().length);
 	}
 
-	public void sendData(final String msg, final int writerBufLen, final int readerBufLen) throws InterruptedException {
+	public void sendData(final String msg, final int writerBufLen, final int readerBufLen, final int expected) throws InterruptedException {
 		final byte[] msgAsBytes = msg.getBytes();
 		final byte[] receivedBytes = new byte[msgAsBytes.length];
 
@@ -89,14 +98,15 @@ public class ReadWritePacketTest extends TestCase {
 			@Override
 			public void run() {
 				byte[] buf = new byte[readerBufLen];
-				String str = "";
-				for (int currOffset = 0, chunkSize = Math.min(buf.length, msgAsBytes.length);
+				int readBytes = 0;
+				for (int currOffset = 0, chunkSize = Math.min(buf.length, expected);
 						currOffset < msg.length();
-						currOffset += chunkSize, chunkSize = Math.min(buf.length, msgAsBytes.length - currOffset)) {
-					receiver.read(buf, 0, chunkSize);
-					System.arraycopy(buf, 0, receivedBytes, currOffset, chunkSize);
-					str = new String(receivedBytes);
+						currOffset += chunkSize, chunkSize = Math.min(buf.length, expected - currOffset)) {
+					int readChunkSize = receiver.read(buf, 0, chunkSize);
+					System.arraycopy(buf, 0, receivedBytes, currOffset, readChunkSize);
+					readBytes += readChunkSize;
 				}
+				assertEquals(msgAsBytes.length, readBytes);
 			};
 		};
 
@@ -111,8 +121,9 @@ public class ReadWritePacketTest extends TestCase {
 	
 	public void testReadWriteSequence() {
 		
-		
 	}
+	
+	
 	
 
 	public static String JABBERWOCKY = "Twas brillig, and the slithy toves\n"

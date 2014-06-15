@@ -135,7 +135,7 @@ public final class Socket {
 			} else if (--trials > 0) {
 				continue;
 			} else {
-				return -1;
+				return currentOffset - offset;
 			}
 		}
 		return currentOffset - offset;
