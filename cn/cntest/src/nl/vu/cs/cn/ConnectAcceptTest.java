@@ -4,6 +4,7 @@ package nl.vu.cs.cn;
 import static nl.vu.cs.cn.TcpSegment.ACK_FLAG;
 import static nl.vu.cs.cn.TcpSegment.PUSH_FLAG;
 import static nl.vu.cs.cn.TcpSegment.SYN_FLAG;
+import static nl.vu.cs.cn.TcpSegment.FIN_FLAG;
 
 import java.io.IOException;
 
@@ -21,7 +22,7 @@ public class ConnectAcceptTest extends TestCase {
 	public static int SERVER_PORT = 4444;
 
 	
-	public void I_testSimpleConnectAccept() throws IOException, InterruptedException {
+	public void testSimpleConnectAccept() throws IOException, InterruptedException {
 		final Socket client = new TCP(CLIENT_IP).socket();
 		final Socket server = new TCP(SERVER_IP).socket(SERVER_PORT);
 		
@@ -54,7 +55,7 @@ public class ConnectAcceptTest extends TestCase {
 		assertEquals(server.remoteSequenceNumber, client.localSequenceNumber);
 	}
 	
-	public void I_testConnectionTryToNonexistentHost() throws IOException {
+	public void testConnectionTryToNonexistentHost() throws IOException {
 		Socket client = new TCP(CLIENT_IP).socket();
 		IpAddress serverAddr = IpAddress.getAddress("192.168.0." + SERVER_IP);
 		boolean isConnected = client.connect(serverAddr, SERVER_PORT);
@@ -62,8 +63,9 @@ public class ConnectAcceptTest extends TestCase {
 		assertFalse(isConnected);
 		assertEquals(client.state, ConnectionState.CLOSED);
 	}
-	
-	public void I_testConnectionTrytoexistentHost() throws IOException{
+	 
+	@SuppressWarnings("unused") // server socket
+	public void testConnectionTrytoUnrespondingHost() throws IOException{
 		final Socket client = new TCP(CLIENT_IP).socket();
 		final Socket server = new TCP(SERVER_IP).socket(SERVER_PORT);
 		
@@ -75,7 +77,7 @@ public class ConnectAcceptTest extends TestCase {
 		
 	}
 	
-	public void I_testConnectionTryToAlreadyBoundHost() throws IOException, InterruptedException {
+	public void testConnectionTryToAlreadyBoundHost() throws IOException, InterruptedException {
 		final Socket client = new TCP(CLIENT_IP).socket();
 		final Socket secondClient = new TCP(CLIENT_2_IP).socket();
 		final Socket server = new TCP(SERVER_IP).socket(SERVER_PORT);
@@ -114,7 +116,7 @@ public class ConnectAcceptTest extends TestCase {
 		assertFalse(isSecondConnected);
 	}
 	
-	public void I_testSynAckLostPacket () throws IOException, InterruptedException {
+	public void testSynAckLostSegment() throws IOException, InterruptedException {
 		final Socket client = new TCP(CLIENT_IP).socket();
 		final Socket secondClient = new TCP(CLIENT_2_IP).socket();
 		final Socket server = new TCP(SERVER_IP).socket(SERVER_PORT);
@@ -174,16 +176,13 @@ public class ConnectAcceptTest extends TestCase {
 		return segment;
 	}
 	
-	public void I_testAckLostClientReads () throws IOException,InterruptedException {
+	public void testAckLostClientReads() throws IOException,InterruptedException {
 		final Socket client = new TCP(CLIENT_IP).socket();
 		final Socket server = new TCP(SERVER_IP).socket(SERVER_PORT);
 		final int offset = 0;
 		final int length = 25;
 		final byte[] receivedBytes = new byte[length];
 
-		client.localSequenceNumber = TCP.getInitSequenceNumber();
-		server.localSequenceNumber = TCP.getInitSequenceNumber();
-		
 		Runnable clientTestTask = new Runnable() {
 			@Override public void run() {
 				IpAddress serverAddr = IpAddress.getAddress("192.168.0." + SERVER_IP);
@@ -195,8 +194,11 @@ public class ConnectAcceptTest extends TestCase {
 		Runnable serverTestTask = new Runnable() {
 			@Override public void run() {
 				server.accept();
-				TcpSegment segment = newSegment(client,client.localSequenceNumber,(byte)(SYN_FLAG | ACK_FLAG | PUSH_FLAG));
-				server.sendSegment(segment);
+				server.sentSegment = newSegment(server, client.localSequenceNumber, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
+				server.sentSegment.setSeq(server.localSequenceNumber - 1);
+				server.sendSegment(server.sentSegment);
+				
+				server.receiveSegment(server.receivedSegment);
 			}
 		};
 		
@@ -205,47 +207,42 @@ public class ConnectAcceptTest extends TestCase {
 		clientTestTask.run();
 		serverThread.join();
 		
-		assertEquals(client.state, ConnectionState.ESTABLISHED);
-		assertEquals(server.state, ConnectionState.ESTABLISHED);
-		
+		assertEquals(server.localSequenceNumber, server.receivedSegment.getAck());
+		assertTrue(server.receivedSegment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG));
 	}
 	
-	public void testAckLostClientWrites () throws IOException,InterruptedException {
+	public void testAckLostClientWrites() throws IOException,InterruptedException {
 		final Socket client = new TCP(CLIENT_IP).socket();
 		final Socket server = new TCP(SERVER_IP).socket(SERVER_PORT);
 		final String msg = "What are we doing tonight?";
 		final int offset = 0;
 		final int length = msg.length();
-		final byte[] receivedBytes = new byte[length];
-		client.localSequenceNumber = TCP.getInitSequenceNumber();
-		server.localSequenceNumber = TCP.getInitSequenceNumber();
 		
 		Runnable clientTestTask = new Runnable() {
 			@Override public void run() {
 				IpAddress serverAddr = IpAddress.getAddress("192.168.0." + SERVER_IP);
 				client.connect(serverAddr, SERVER_PORT);
-				TcpSegment receivedSynAckSegment = server.receivedSegment;
-				client.receiveSegment(server.receivedSegment);
 				client.write(msg.getBytes(), offset, length);
-				
 			}
 		};
 		
 		Runnable serverTestTask = new Runnable() {
 			@Override public void run() {
 				server.accept();
-				TcpSegment segment = newSegment(client,client.localSequenceNumber,(byte)(SYN_FLAG | ACK_FLAG | PUSH_FLAG));
-				server.sendSegment(segment);
-				server.receiveSegment(server.receivedSegment);
-				TcpSegment firstReceivedSegment = server.receivedSegment;
-				server.receiveSegment(server.receivedSegment);
-				TcpSegment SecondReceivedSegment = server.receivedSegment;
-				//server.read(receivedBytes, offset, length);
 				
-				assertEquals(firstReceivedSegment.hasAckFlag(),true);
-				assertEquals(SecondReceivedSegment.hasAckFlag(),true);
-				assertEquals(SecondReceivedSegment.dataLength, msg.length());
+				server.sentSegment = newSegment(server, client.localSequenceNumber, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
+				server.sentSegment.setSeq(server.localSequenceNumber - 1);
+				server.sendSegment(server.sentSegment);
 				
+				server.receiveSegment(server.receivedSegment);
+				boolean isFirstAck = server.localSequenceNumber == server.receivedSegment.getAck()
+						&& server.receivedSegment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG);
+				
+				server.receiveSegment(server.receivedSegment);
+				boolean isSecondAck = server.localSequenceNumber == server.receivedSegment.getAck()
+						&& server.receivedSegment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG);
+
+				assertTrue(isFirstAck || isSecondAck);
 			}
 		};
 		
@@ -253,10 +250,6 @@ public class ConnectAcceptTest extends TestCase {
 		serverThread.start();
 		clientTestTask.run();
 		serverThread.join();
-		
-		assertEquals(client.state, ConnectionState.ESTABLISHED);
-		assertEquals(server.state, ConnectionState.ESTABLISHED);
-		assertEquals(new String(receivedBytes), msg);
 	}
 	
 

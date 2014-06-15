@@ -195,6 +195,7 @@ public final class Socket {
 			state = ConnectionState.CLOSED;
 			remoteAddress = 0;
 			remotePort = 0;
+			remoteEstablished = false;
 		}
 		return true;
 	}
@@ -278,7 +279,12 @@ public final class Socket {
 		fillBasicSegmentData(sentSegment);
 		sentSegment.setAck(remoteSequenceNumber);
 		sentSegment.setFlags((byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
-		return deliverSegment(sentSegment) != -1;
+		if (deliverSegment(sentSegment) != -1) {
+			remoteEstablished = true;
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	private int deliverDataSegment(byte[] src, int offset, int len) {
@@ -369,7 +375,9 @@ public final class Socket {
 		if (segment.hasFlags(allOf, noneOf)
 			&& segment.getAck() >= ackLowerBound
 			&& segment.getAck() <= ackLowerBound + ackOffset) {
-			remoteEstablished = true;
+			if (!actuallySynAck) {
+				remoteEstablished = true;
+			}
 			return true;
 		} else {
 			return false;
@@ -410,8 +418,8 @@ public final class Socket {
 				&& segment.hasFlags(FIN_FLAG, SYN_FLAG | ACK_FLAG);
 	}
 	
-	private void onDelayedSynAckReceived(int remoteSeqNumber) {
-		sendAckSegment(receivedSegment, remoteSeqNumber);
+	private void onDelayedSynAckReceived(int synAckSeq) {
+		sendAckSegment(receivedSegment, synAckSeq + 1);
 	}
 	
 	private void onFinReceived(int remoteSeqNumber) {
@@ -423,6 +431,7 @@ public final class Socket {
 			state = ConnectionState.CLOSED;
 			remoteAddress = 0;
 			remotePort = 0;
+			remoteEstablished = false;
 		}
 	}
 	// @formatter:on
@@ -486,5 +495,5 @@ public final class Socket {
 
 	/* package */TcpSegment receivedSegment = new TcpSegment();
 
-	/* package */boolean remoteEstablished;
+	/* package */boolean remoteEstablished = false;
 }
