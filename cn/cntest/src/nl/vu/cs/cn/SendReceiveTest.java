@@ -44,19 +44,19 @@ public class SendReceiveTest extends TestCase {
 		
 	}
 	
-	public void I_testOneSendWithoutData() {
+	public void testOneSendWithoutData() {
 		TcpSegment segment = newSegment(sender, 12345, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
 		sendAndValidateMessage(sender, receiver, segment, "");
 	}
 	
-	public void I_testOneSendWithData() {
+	public void testOneSendWithData() {
 		String hamlet = "To be or not to be";
 		
 		TcpSegment segment = newSegment(sender, 12345, (byte) (PUSH_FLAG));
 		sendAndValidateMessage(sender, receiver, segment, hamlet);
 	}
 	
-	public void I_testFewSendsWithData() {
+	public void testFewSendsWithData() {
 		String witch1 = "When shall we three meet again? " +
 				"In thunder, lightning or in rain?";
 		String witch2 = "When the hurlyburly's done. " +
@@ -73,7 +73,7 @@ public class SendReceiveTest extends TestCase {
 		sendAndValidateMessage(sender, receiver, segment, witch3);
 	}
 	
-	public void I_testMessagesExchange() {
+	public void testMessagesExchange() {
 		String romeo1 = "My lips, two blushing pilgrims, ready stand" +
 				"To smooth that rough touch with a tender kiss.";
 		String juliet1 = "Saints have hands that pilgrims' hands do touch," +
@@ -143,10 +143,9 @@ public class SendReceiveTest extends TestCase {
 		segment.setChecksum((short)21234);
 		
 		sender.ip.ip_send(sender.packetFrom(sender.sentPacket, segment));
-		boolean check = receiver.receiveSegment(receiver.receivedSegment);
+		boolean check = receiver.receiveSegmentWithTimeout(receiver.receivedSegment, TCP.RECV_WAIT_TIMEOUT_SECONDS);
 		
 		assertEquals(check, false);
-		
 	}
 	
 	public void testInvalidProtocolPacket() throws IOException{
@@ -162,7 +161,7 @@ public class SendReceiveTest extends TestCase {
 		sentPacket.length = segment.length;
 		segment.setChecksum(sender.checksumFor(segment));
 		sender.ip.ip_send(sentPacket);
-		boolean check = receiver.receiveSegment(receiver.receivedSegment);
+		boolean check = receiver.receiveSegmentWithTimeout(receiver.receivedSegment, TCP.RECV_WAIT_TIMEOUT_SECONDS);
 		
 		assertEquals(check, false);
 	}
@@ -180,7 +179,7 @@ public class SendReceiveTest extends TestCase {
 		sentPacket.length = 5;
 		
 		sender.ip.ip_send(sentPacket);
-		boolean check = receiver.receiveSegment(receiver.receivedSegment);
+		boolean check = receiver.receiveSegmentWithTimeout(receiver.receivedSegment, TCP.RECV_WAIT_TIMEOUT_SECONDS);
 		
 		assertEquals(check, false);
 	}

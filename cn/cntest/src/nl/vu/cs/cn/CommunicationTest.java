@@ -1,6 +1,7 @@
 package nl.vu.cs.cn;
 
 import java.io.IOException;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -63,7 +64,7 @@ public class CommunicationTest extends TestCase {
 	public void IGNORE_testBusyServer() throws IOException, InterruptedException {
 		final int CLIENTS_SIZE = 10; // if changed add new responses; if more that 100 change SERVER_ADDR;
 		final int RESPONSE_MAX_SIZE = 100;
-		final int MAX_RUN_TIME_SEC = 60;
+		final int MAX_RUN_TIME_SEC = 600;
 		
 		final Socket[] clients = new Socket[CLIENTS_SIZE];
 		for (int i = 0; i < CLIENTS_SIZE; ++i) {
@@ -86,6 +87,8 @@ public class CommunicationTest extends TestCase {
 		};
 		final String[] clientReceivedResponses = new String[CLIENTS_SIZE];
 		
+		final Random rnd = new Random();
+		
 		class ClientTask implements Runnable {
 			
 			int id;
@@ -99,7 +102,11 @@ public class CommunicationTest extends TestCase {
 				byte[] query = { (byte) id };
 				byte[] response = new byte[RESPONSE_MAX_SIZE];
 				
-				while (!clients[id].connect(serverAddr, SERVER_PORT));
+				do  {
+					try {
+						Thread.sleep(rnd.nextInt(4000) + 1000);
+					} catch (InterruptedException fuckIt) { }
+				} while (!clients[id].connect(serverAddr, SERVER_PORT));
 				clients[id].write(query, 0, query.length);
 				clients[id].close();
 				int receivedBytes = clients[id].read(response, 0, response.length);

@@ -358,13 +358,20 @@ public final class Socket {
 			} else if (isValidFin(segment)) {
 				onFinReceived(segment.getSeq());
 				continue;
+			} else if (!remoteEstablished && isValidDelayedSynAck(segment)) {
+				onDelayedSynAckReceived(segment.getSeq());
+				continue;
 			}
 			break;
 		}
-		return segment.getFromPort() == remotePort 
-			&& segment.hasFlags(allOf, noneOf)
+		if (segment.hasFlags(allOf, noneOf)
 			&& segment.getAck() >= ackLowerBound
-			&& segment.getAck() <= ackLowerBound + ackOffset;
+			&& segment.getAck() <= ackLowerBound + ackOffset) {
+			remoteEstablished = true;
+			return true;
+		} else {
+			return false;
+		}
 	}
 	
 	private boolean receiveDataSegment(TcpSegment segment, byte[] dst, int offset) {
@@ -380,8 +387,7 @@ public final class Socket {
 			}
 			break;
 		}
-		if (segment.getFromPort() == remotePort
-			&& (segment.getSeq() == oldRemoteSequenceNumber || segment.getSeq() == remoteSequenceNumber)
+		if ((segment.getSeq() == oldRemoteSequenceNumber || segment.getSeq() == remoteSequenceNumber)
 			&& segment.hasFlags(0, SYN_FLAG | ACK_FLAG | FIN_FLAG)
 	 		&& segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber >= 0) {
 			segment.getData(dst, offset);
@@ -393,14 +399,12 @@ public final class Socket {
 	}
 	
 	private boolean isValidDelayedSynAck(TcpSegment segment) {
-		return segment.getFromPort() == remotePort
-				&& segment.hasFlags(SYN_FLAG | ACK_FLAG, FIN_FLAG)
+		return segment.hasFlags(SYN_FLAG | ACK_FLAG, FIN_FLAG)
 				&& segment.getAck() == localSequenceNumber;
 	}
 
 	private boolean isValidFin(TcpSegment segment) {
-		return segment.getFromPort() == remotePort
-				&& (segment.getSeq() == oldRemoteSequenceNumber || segment.getSeq() == remoteSequenceNumber)
+		return (segment.getSeq() == oldRemoteSequenceNumber || segment.getSeq() == remoteSequenceNumber)
 				&& segment.hasFlags(FIN_FLAG, SYN_FLAG | ACK_FLAG);
 	}
 	
@@ -429,18 +433,24 @@ public final class Socket {
 	/* package */boolean receiveSegmentWithTimeout(TcpSegment segment,
 			int timeoutSeconds) {
 		try {
-
-			ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
-			if (receivedPacket.protocol != IP.TCP_PROTOCOL
-					&& (remoteAddress == 0 || (Integer
-							.reverseBytes(remoteAddress) == receivedPacket.source))) {
-				return false;
+			for (;;) {
+				ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
+				if (receivedPacket.protocol != IP.TCP_PROTOCOL) {
+					continue;
+				}
+				int remoteAddressHost = Integer.reverseBytes(remoteAddress);
+				if (remoteAddress != 0 && remoteAddressHost != receivedPacket.source) {
+					continue;
+				}
+				segment = segmentFrom(receivedPacket, segment);
+				if (remotePort != 0 && segment.getFromPort() != remotePort) {
+					continue;
+				}
+				if (remoteAddress == 0) {
+					remoteAddress = Integer.reverseBytes(receivedPacket.source);
+				}
+				return isValid(segment);
 			}
-			segment = segmentFrom(receivedPacket, segment);
-			if (remoteAddress == 0) {
-				remoteAddress = Integer.reverseBytes(receivedPacket.source);
-			}
-			return isValid(segment);
 		} catch (InterruptedException e) {
 			return false;
 		} catch (IOException e) {
