@@ -47,7 +47,7 @@ public class TcpSegmentTest extends TestCase {
 		assertFalse(segment.hasFinFlag());
 		
 		byte[] restoredData = new byte[data.length];
-		segment.getData(restoredData, 0);
+		segment.getData(restoredData, 0, segment.dataLength);
 		assertEquals(new String(restoredData), msg);
 	}
 	
@@ -74,7 +74,7 @@ public class TcpSegmentTest extends TestCase {
 		byte[] prefix = "black ".getBytes();
 		byte[] restoredData = new byte[prefix.length + 5];
 		System.arraycopy(prefix, 0, restoredData, 0, prefix.length);
-		segment.getData(restoredData, prefix.length);
+		segment.getData(restoredData, prefix.length, segment.dataLength);
 		assertEquals(new String(restoredData), "black raven");
 	}
 }

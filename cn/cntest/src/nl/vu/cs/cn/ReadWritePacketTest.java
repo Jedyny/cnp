@@ -58,26 +58,46 @@ public class ReadWritePacketTest extends TestCase {
 	public void testReadWriteLotOfData() throws InterruptedException {
 		sendData(JABBERWOCKY);
 	}
-
+	
+	public void testReadWriteWithDifferentBuffers() throws InterruptedException {
+		sendData(JABBERWOCKY, 100, 20);
+		sendData(JABBERWOCKY, 20, 100);
+	}
+	
 	public void sendData(String msg) throws InterruptedException {
-		final byte[] msgAsBytes = msg.getBytes();
-		final int offset = 0;
-		final int length = msgAsBytes.length;
+		sendData(msg, msg.getBytes().length, msg.getBytes().length);
+	}
 
-		final byte[] receivedBytes = new byte[length];
+	public void sendData(final String msg, final int writerBufLen, final int readerBufLen) throws InterruptedException {
+		final byte[] msgAsBytes = msg.getBytes();
+		final byte[] receivedBytes = new byte[msgAsBytes.length];
 
 		Runnable writer = new Runnable() {
 			@Override
 			public void run() {
-				sender.write(msgAsBytes, offset, length);
-			}
+				byte[] buf = new byte[writerBufLen];
+				for (int currOffset = 0, chunkSize = Math.min(buf.length, msgAsBytes.length);
+						currOffset < msg.length();
+						currOffset += chunkSize, chunkSize = Math.min(buf.length, msgAsBytes.length - currOffset)) {
+					System.arraycopy(msgAsBytes, currOffset, buf, 0, chunkSize);
+					sender.write(buf, 0, chunkSize);
+				}
+			};
 		};
 
 		Runnable reader = new Runnable() {
 			@Override
 			public void run() {
-				receiver.read(receivedBytes, offset, length);
-			}
+				byte[] buf = new byte[readerBufLen];
+				String str = "";
+				for (int currOffset = 0, chunkSize = Math.min(buf.length, msgAsBytes.length);
+						currOffset < msg.length();
+						currOffset += chunkSize, chunkSize = Math.min(buf.length, msgAsBytes.length - currOffset)) {
+					receiver.read(buf, 0, chunkSize);
+					System.arraycopy(buf, 0, receivedBytes, currOffset, chunkSize);
+					str = new String(receivedBytes);
+				}
+			};
 		};
 
 		Thread writerThread = new Thread(writer);
@@ -85,8 +105,15 @@ public class ReadWritePacketTest extends TestCase {
 		reader.run();
 		writerThread.join();
 
-		assertEquals(new String(receivedBytes), msg);
+		String receivedMsg = new String(receivedBytes);
+		assertEquals(msg, receivedMsg);
 	}
+	
+	public void testReadWriteSequence() {
+		
+		
+	}
+	
 
 	public static String JABBERWOCKY = "Twas brillig, and the slithy toves\n"
 			+ "Did gyre and gimble in the wabe;\n"

@@ -42,8 +42,9 @@ import java.nio.ByteBuffer;
 		return buffer.getShort(CHECKSUM_IX);
 	}
 	
-	public void getData(byte[] dst, int dstOffset) {
-		System.arraycopy(buffer.array(), DATA_IX, dst, dstOffset, dataLength);
+	public void getData(byte[] dst, int dstOffset, int maxlen) {
+		int toCopy = Math.min(maxlen, dataLength);
+		System.arraycopy(buffer.array(), DATA_IX, dst, dstOffset, toCopy);
 	}
 	
 	public boolean hasFlags(int allOfMask, int noneOfMask) {
@@ -107,7 +108,7 @@ import java.nio.ByteBuffer;
 	@Override
 	public String toString() {
 		byte[] data = new byte[dataLength];
-		getData(data, 0);
+		getData(data, 0, dataLength);
 		
 		StringBuilder builder = new StringBuilder("[");
 		builder.append("from_port = ").append(getFromPort()).append("; ");

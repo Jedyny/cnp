@@ -116,12 +116,14 @@ public final class Socket {
 		int currentOffset = offset;
 		int trials = TCP.MAX_RESEND_TRIALS;
 		while (currentOffset - offset < maxlen) {
-			if (receiveDataSegment(receivedSegment, buf, currentOffset)) {
-				currentOffset += receivedSegment.dataLength
+			int maxChunkSize = maxlen - currentOffset - offset;
+			if (receiveDataSegment(receivedSegment, buf, currentOffset, maxChunkSize)) {
+				int recvLen = Math.min(receivedSegment.dataLength, maxChunkSize);
+				currentOffset += recvLen
 						+ receivedSegment.getSeq() - remoteSequenceNumber;
 
 				int toAcknowledge = receivedSegment.getSeq()
-						+ receivedSegment.dataLength;
+						+ recvLen;
 				if (!sendAckSegment(sentSegment, toAcknowledge)) {
 					return currentOffset - offset;
 				}
@@ -374,7 +376,7 @@ public final class Socket {
 		}
 	}
 	
-	private boolean receiveDataSegment(TcpSegment segment, byte[] dst, int offset) {
+	private boolean receiveDataSegment(TcpSegment segment, byte[] dst, int offset, int maxlen) {
 		for (;;) { // receiving valid segment should not cause failure even if it is not data
 			if (!receiveSegmentWithTimeout(segment, TCP.RECV_WAIT_TIMEOUT_SECONDS)) {
 				return false;
@@ -390,7 +392,7 @@ public final class Socket {
 		if ((segment.getSeq() == oldRemoteSequenceNumber || segment.getSeq() == remoteSequenceNumber)
 			&& segment.hasFlags(0, SYN_FLAG | ACK_FLAG | FIN_FLAG)
 	 		&& segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber >= 0) {
-			segment.getData(dst, offset);
+			segment.getData(dst, offset, maxlen);
 			remoteEstablished = true;
 			return true;
 		} else {

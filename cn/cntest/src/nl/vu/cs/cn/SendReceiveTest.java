@@ -120,7 +120,7 @@ public class SendReceiveTest extends TestCase {
 		assertEquals(receivedSegment.dataLength, data.length);
 		
 		byte[] receivedData = new byte[data.length];
-		receivedSegment.getData(receivedData, 0);
+		receivedSegment.getData(receivedData, 0, receivedSegment.dataLength);
 		assertEquals(new String(receivedData), message);
 	}
 	
