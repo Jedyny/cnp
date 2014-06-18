@@ -1,15 +1,15 @@
 package nl.vu.cs.cn;
 
 import static nl.vu.cs.cn.TcpSegment.ACK_FLAG;
-import static nl.vu.cs.cn.TcpSegment.FIN_FLAG;
 import static nl.vu.cs.cn.TcpSegment.PUSH_FLAG;
 import static nl.vu.cs.cn.TcpSegment.SYN_FLAG;
 
 import java.io.IOException;
 
+import junit.framework.TestCase;
 import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.IP.Packet;
-import junit.framework.TestCase;
+import nl.vu.cs.cn.TCP.Socket;
 
 public class SendReceiveTest extends TestCase {
 

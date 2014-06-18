@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase;
 import nl.vu.cs.cn.IP.IpAddress;
+import nl.vu.cs.cn.TCP.Socket;
 
 public class CommunicationTest extends TestCase {
 	

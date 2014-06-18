@@ -2,8 +2,9 @@ package nl.vu.cs.cn;
 
 import java.io.IOException;
 
-import nl.vu.cs.cn.IP.IpAddress;
 import junit.framework.TestCase;
+import nl.vu.cs.cn.IP.IpAddress;
+import nl.vu.cs.cn.TCP.Socket;
 
 public class CloseConnectionTest extends TestCase {
 	
