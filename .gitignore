@@ -32,3 +32,6 @@ hs_err_*
 
 # Editor temporary files
 *~
+
+# Assignment tar
+assignment.tar
