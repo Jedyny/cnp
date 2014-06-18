@@ -77,4 +77,29 @@ public class TcpSegmentTest extends TestCase {
 		segment.getData(restoredData, prefix.length, segment.dataLength);
 		assertEquals(new String(restoredData), "black raven");
 	}
+	
+	public void testBufferEnlargement() {
+		String longMessage = ReadWritePacketTest.JABBERWOCKY;
+		byte[] data = longMessage.getBytes();
+		
+		TcpSegment segment = new TcpSegment();
+		segment.setToPort((short) 20);
+		segment.setFromPort((short) 80);
+		segment.setSeq(123456789);
+		segment.setAck(123456790);
+		segment.setFlags((byte) (ACK_FLAG | SYN_FLAG));
+		segment.setData(data, 0, data.length);
+		
+		assertEquals(segment.getToPort(), 20);
+		assertEquals(segment.getFromPort(), 80);
+		assertEquals(segment.getSeq(), 123456789);
+		assertEquals(segment.getAck(), 123456790);
+		assertTrue(segment.hasAckFlag());
+		assertTrue(segment.hasSynFlag());
+		assertFalse(segment.hasFinFlag());
+		
+		byte[] restoredData = new byte[data.length];
+		segment.getData(restoredData, 0, segment.dataLength);
+		assertEquals(longMessage, new String(restoredData));
+	}
 }

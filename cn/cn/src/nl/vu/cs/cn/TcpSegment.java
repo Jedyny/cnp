@@ -1,14 +1,16 @@
 package nl.vu.cs.cn;
 
-import java.nio.ByteBuffer;
+import nl.vu.cs.cn.util.InfiniteByteBuffer;
 
 /* package */ final class TcpSegment {
 
+	/* package */ static int TCP_SEGMENT_INIT_LENGTH = 32;
+	
 	/* package */ static int TCP_MAX_DATA_LENGTH = 128;
 	
 	public void fromByteArray(byte[] data, int length) {
 		if (data != buffer.array()) {
-			System.arraycopy(data, 0, buffer.array(), 0, length);
+			buffer.putArray(0, data, 0, length);
 		}
 		this.length = length;
 		this.dataLength = length - TCP_HEADER_LENGTH;
@@ -44,7 +46,7 @@ import java.nio.ByteBuffer;
 	
 	public void getData(byte[] dst, int dstOffset, int maxlen) {
 		int toCopy = Math.min(maxlen, dataLength);
-		System.arraycopy(buffer.array(), DATA_IX, dst, dstOffset, toCopy);
+		buffer.getArray(DATA_IX, dst, dstOffset, toCopy);
 	}
 	
 	public boolean hasFlags(int allOfMask, int noneOfMask) {
@@ -100,7 +102,7 @@ import java.nio.ByteBuffer;
 	}
 	
 	public void setData(byte[] src, int srcOffset, int length) {
-		System.arraycopy(src, srcOffset, buffer.array(), DATA_IX, length);
+		buffer.putArray(DATA_IX, src, srcOffset, length);
 		this.length = length + TCP_HEADER_LENGTH;
 		this.dataLength = length;
 	}
@@ -136,7 +138,7 @@ import java.nio.ByteBuffer;
 
 	/* package */ static short FIN_FLAG = 1;
 	
-	/* package */ ByteBuffer buffer = ByteBuffer.allocate(TCP_HEADER_LENGTH + TCP_MAX_DATA_LENGTH);
+	/* package */ InfiniteByteBuffer buffer = InfiniteByteBuffer.withCapacity(TCP_SEGMENT_INIT_LENGTH);
 	
 	/* package */ int length = TCP_HEADER_LENGTH;
 	
