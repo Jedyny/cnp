@@ -22,7 +22,7 @@ import static nl.vu.cs.cn.util.Preconditions.checkState;
 public class TCP {
 	
 	/** The underlying IP stack for this TCP stack. */
-	private IP ip;
+	protected IP ip;
 	
 	private static short DEFAULT_PORT = 1453;
 	private static short CURRENT_PORT = DEFAULT_PORT;
@@ -349,7 +349,10 @@ public class TCP {
 		// package to simplify testing
 		/* package */boolean sendSegment(TcpSegment segment) {
 			try {
-				segment.setChecksum(checksumFor(segment));
+				// sometimes we are resending, no need to calculate it again
+				if (segment.getChecksum() == 0) { 
+					segment.setChecksum(checksumFor(segment));
+				}
 				ip.ip_send(packetFrom(sentPacket, segment));
 				return true;
 			} catch (IOException e) {
@@ -521,6 +524,11 @@ public class TCP {
 	public TCP(int address) throws IOException {
 		ip = new IP(address);
 	}
+	
+	/*
+	 * for testing purposes
+	 */
+	protected TCP() { }
 
 	/**
 	 * @return a new socket for this stack
