@@ -144,7 +144,8 @@ public class TCP {
 			int currentOffset = offset;
 			int trials = TCP.MAX_RESEND_TRIALS;
 			while (currentOffset - offset < maxlen) {
-				int maxChunkSize = maxlen - currentOffset - offset;
+				int maxChunkSize = maxlen - (currentOffset - offset);
+				Log.i(TAG, "maxlen: " + maxlen + "; currOff: " + currentOffset + "; off: " + offset);
 				if (receiveDataSegment(receivedSegment, buf, currentOffset, maxChunkSize)) {
 					int recvLen = Math.min(receivedSegment.dataLength, maxChunkSize);
 					int newOffset = currentOffset + recvLen
@@ -377,7 +378,7 @@ public class TCP {
 				if (segment.getChecksum() == 0) { 
 					segment.setChecksum(checksumFor(segment));
 				}
-				//Log.i(TAG, "Sending segment " + segment);
+				Log.i(TAG, "Sending segment " + segment);
 				ip.ip_send(packetFrom(sentPacket, segment));
 				return true;
 			} catch (IOException e) {
@@ -504,7 +505,7 @@ public class TCP {
 					if (!isValid(segment)) {
 						return false;
 					} else {
-						//Log.i(TAG, "Received segment " + segment);
+						Log.i(TAG, "Received segment " + segment);
 						return true;
 					}
 				}

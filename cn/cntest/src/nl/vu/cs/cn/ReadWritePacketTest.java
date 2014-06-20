@@ -61,13 +61,43 @@ public class ReadWritePacketTest extends TestCase {
 	}
 	
 	public void testReadWriteWithDifferentBuffers() throws InterruptedException {
-		sendData(JABBERWOCKY, 100, 20);
-		sendData(JABBERWOCKY, 20, 100);
+		sendData(JABBERWOCKY, 97, 17);
+		sendData(JABBERWOCKY, 23, 101);
 	}
 	
 	public void testReadLessThanExpected() throws InterruptedException {
-		byte[] jabberbytes = JABBERWOCKY.getBytes();
-		sendData(JABBERWOCKY, jabberbytes.length, jabberbytes.length + 32, jabberbytes.length + 32);
+		byte[] jabberbyty = JABBERWOCKY.getBytes();
+		sendData(JABBERWOCKY, jabberbyty.length, jabberbyty.length + 32, jabberbyty.length + 32);
+	}
+	
+	public void testReadWriteWithOffsets() throws InterruptedException {
+		final String msg = JABBERWOCKY;
+		final int offset = JABBERWOCKY.length() >>> 2;
+		
+		final byte[] msgAsBytes = msg.getBytes();
+		final byte[] receivedBytes = new byte[msgAsBytes.length];
+
+		Runnable writer = new Runnable() {
+			@Override
+			public void run() {
+				sender.write(msgAsBytes, offset, msgAsBytes.length - offset);
+			};
+		};
+
+		Runnable reader = new Runnable() {
+			@Override
+			public void run() {
+				receiver.read(receivedBytes, offset, msgAsBytes.length - offset);
+			};
+		};
+
+		Thread writerThread = new Thread(writer);
+		writerThread.start();
+		reader.run();
+		writerThread.join();
+
+		String receivedMsg = new String(receivedBytes, offset, msgAsBytes.length - offset);
+		assertEquals(msg.substring(offset), receivedMsg);
 	}
 	
 	public void sendData(String msg) throws InterruptedException {
