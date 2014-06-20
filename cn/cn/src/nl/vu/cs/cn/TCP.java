@@ -27,11 +27,13 @@ public class TCP {
 	/** The underlying IP stack for this TCP stack. */
 	protected IP ip;
 	
-	private static short DEFAULT_PORT = 1453;
+	private static final short DEFAULT_PORT = 1453;
 	private static short CURRENT_PORT = DEFAULT_PORT;
 	
-	/* package */ static int RECV_WAIT_TIMEOUT_SECONDS = 1;
-	/* package */ static int MAX_RESEND_TRIALS = 10;
+	/* package */ static final int RECV_WAIT_TIMEOUT_SECONDS = 1;
+	/* package */ static final int MAX_RESEND_TRIALS = 10;
+	
+	private static final boolean SEND_RECEIVE_LOGGING_ENABLED = true; 
 	
 	/**
 	 * This class represents a TCP socket.
@@ -378,7 +380,9 @@ public class TCP {
 				if (segment.getChecksum() == 0) { 
 					segment.setChecksum(checksumFor(segment));
 				}
-				Log.i(TAG, "Sending segment " + segment);
+				if (SEND_RECEIVE_LOGGING_ENABLED) {
+					Log.i(TAG, "Sending segment " + segment);
+				}
 				ip.ip_send(packetFrom(sentPacket, segment));
 				return true;
 			} catch (IOException e) {
@@ -505,7 +509,9 @@ public class TCP {
 					if (!isValid(segment)) {
 						return false;
 					} else {
-						Log.i(TAG, "Received segment " + segment);
+						if (SEND_RECEIVE_LOGGING_ENABLED) {
+							Log.i(TAG, "Received segment " + segment);
+						}
 						return true;
 					}
 				}

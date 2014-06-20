@@ -253,7 +253,6 @@ public class ConnectAcceptTest extends TestCase {
 		serverThread.join();
 	}
 	
-
 }
 
 

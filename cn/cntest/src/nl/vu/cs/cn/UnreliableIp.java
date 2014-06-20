@@ -2,11 +2,14 @@ package nl.vu.cs.cn;
 
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Random;
 
-import nl.vu.cs.cn.IP;
+import android.util.Log;
 
 public class UnreliableIp extends IP {
+	
+	public static final String TAG = "Big Bad Rude IP Wizard";
 	
 	public UnreliableIp(int address) throws IOException {
 		super(address);
@@ -15,14 +18,25 @@ public class UnreliableIp extends IP {
 	@Override
 	public int ip_send(Packet p) throws IOException {
 		if (random.nextDouble() < packageLossProbability) {
+			Log.i(TAG, "Abracadabra, hocus pocus, packet lost, bitch.");
 			return p.length;
 		}
 		
 		if (random.nextDouble() < packageCorruptionProbability) {
-			random.nextBytes(p.data);
+			Log.i(TAG, "Abracadabra, alakazam, pikachu, packet corrupted, asshole.");
+			Packet newPacket = new Packet(); // we cannot currupt directly the packet, since Socket class reuses it.
+			newPacket.destination = p.destination;
+			newPacket.id = p.id;
+			newPacket.length = p.length;
+			newPacket.protocol = p.protocol;
+			newPacket.source = p.source;
+			newPacket.data = new byte[p.data.length];
+			random.nextBytes(newPacket.data);
+			p = newPacket;
 		}
 		
 		if (random.nextDouble() < packageDuplicationProbability) {
+			Log.i(TAG, "Wingardium leviooosa, packet cloned, moron.");
 			super.ip_send(p);
 		}
 		
