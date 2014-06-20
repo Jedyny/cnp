@@ -1,10 +1,5 @@
 package nl.vu.cs.cn;
 
-import java.io.IOException;
-
-import nl.vu.cs.cn.IP.IpAddress;
-import nl.vu.cs.cn.IP.Packet;
-
 import static nl.vu.cs.cn.TcpSegment.ACK_FLAG;
 import static nl.vu.cs.cn.TcpSegment.FIN_FLAG;
 import static nl.vu.cs.cn.TcpSegment.PUSH_FLAG;
@@ -15,11 +10,19 @@ import static nl.vu.cs.cn.util.Preconditions.checkArgument;
 import static nl.vu.cs.cn.util.Preconditions.checkNotNull;
 import static nl.vu.cs.cn.util.Preconditions.checkState;
 
+import java.io.IOException;
+
+import nl.vu.cs.cn.IP.IpAddress;
+import nl.vu.cs.cn.IP.Packet;
+import android.util.Log;
+
 /**
  * This class represents a TCP stack. It should be built on top of the IP stack
  * which is bound to a given IP address.
  */
 public class TCP {
+	
+	private static final String TAG = TCP.class.getSimpleName();
 	
 	/** The underlying IP stack for this TCP stack. */
 	protected IP ip;
@@ -34,7 +37,9 @@ public class TCP {
 	 * This class represents a TCP socket.
 	 * 
 	 */
-	public final class Socket {
+	public static final class Socket {
+		
+		private final String TAG;
 
 		/**
 		 * Construct a socket bound to the given local port.
@@ -49,6 +54,7 @@ public class TCP {
 			sentPacket.data = new byte[TCP_HEADER_LENGTH + TCP_MAX_DATA_LENGTH];
 			receivedPacket.data = new byte[TCP_HEADER_LENGTH + TCP_MAX_DATA_LENGTH];
 			localPort = (short) port;
+			TAG = "Socket (" + ip.getLocalAddress() + ":" + localPort + ")"; 
 		}
 
 		/**
@@ -61,6 +67,7 @@ public class TCP {
 		 * @return true if the connect succeeded.
 		 */
 		public boolean connect(IpAddress dst, int port) {
+			Log.i(TAG, "Connecting to address: " + dst + "; port: " + port);
 			if (state != ConnectionState.CLOSED) {
 				return false;
 			}
@@ -72,12 +79,14 @@ public class TCP {
 				return false;
 			}
 
+			Log.i(TAG, "SYN sent and acknowledged");
 			++localSequenceNumber;
 			if (!sendAckSegment(sentSegment, receivedSegment.getSeq() + 1)) {
 				return false;
 			}
 
 			state = ConnectionState.ESTABLISHED;
+			Log.i(TAG, "Connected");
 			return true;
 		}
 
@@ -90,21 +99,28 @@ public class TCP {
 		 */
 		public void accept() {
 			checkState(state == ConnectionState.CLOSED);
-
+			Log.i(TAG, "Listening on port " + localPort);
+			
 			for (;;) {
 				receiveSynSegment(receivedSegment);
 
 				localSequenceNumber = TCP.getInitSequenceNumber();
 				remotePort = receivedSegment.getFromPort();
 				remoteSequenceNumber = receivedSegment.getSeq() + 1;
+				
+				String addr = IpAddress.htoa(Integer.reverseBytes(remoteAddress));
+				Log.i(TAG, "Received SYN segment from address: " + addr + "; port: " + remotePort);
 
 				if (deliverSynAckSegment()) {
 					++localSequenceNumber;
 					break;
 				}
+				Log.i(TAG, "SYN ACK sent and acknowledged");
 			}
 
 			state = ConnectionState.ESTABLISHED;
+			int addrHostOrder = Integer.reverseBytes(remoteAddress);
+			Log.i(TAG, "Connection established. Remote address: " + IpAddress.htoa(addrHostOrder) + "; remote port: " + remotePort);
 		}
 
 		/**
@@ -124,15 +140,18 @@ public class TCP {
 			checkState(state == ConnectionState.ESTABLISHED
 					|| state == ConnectionState.READ_ONLY);
 
+			Log.i(TAG, "Reading " + maxlen + " bytes...");
 			int currentOffset = offset;
 			int trials = TCP.MAX_RESEND_TRIALS;
 			while (currentOffset - offset < maxlen) {
 				int maxChunkSize = maxlen - currentOffset - offset;
 				if (receiveDataSegment(receivedSegment, buf, currentOffset, maxChunkSize)) {
 					int recvLen = Math.min(receivedSegment.dataLength, maxChunkSize);
-					currentOffset += recvLen
+					int newOffset = currentOffset + recvLen
 							+ receivedSegment.getSeq() - remoteSequenceNumber;
-
+					Log.i(TAG, "" + (newOffset - currentOffset) + " new bytes received.");
+					currentOffset = newOffset;
+					
 					int toAcknowledge = receivedSegment.getSeq()
 							+ recvLen;
 					if (!sendAckSegment(sentSegment, toAcknowledge)) {
@@ -168,6 +187,7 @@ public class TCP {
 			checkState(state == ConnectionState.ESTABLISHED
 					|| state == ConnectionState.WRITE_ONLY);
 
+			Log.i(TAG, "Writing message: " + new String(buf, offset, len));
 			int dataLeft = len;
 			int currOffset = offset;
 			while (dataLeft > 0) {
@@ -182,6 +202,8 @@ public class TCP {
 				currOffset += acknowledged;
 				dataLeft -= acknowledged;
 				localSequenceNumber = ack;
+
+				Log.i(TAG, "" + dataLength + " sent; " + acknowledged + " acknowledged; " + dataLeft + " left");
 			}
 			return len;
 		}
@@ -197,6 +219,7 @@ public class TCP {
 				return false;
 			}
 
+			Log.i(TAG, "Closing the connection...");
 			deliverFinSegment();
 			++localSequenceNumber;
 
@@ -208,6 +231,7 @@ public class TCP {
 				remotePort = 0;
 				remoteEstablished = false;
 			}
+			Log.i(TAG, "Current connection state: " + state);
 			return true;
 		}
 
@@ -353,6 +377,7 @@ public class TCP {
 				if (segment.getChecksum() == 0) { 
 					segment.setChecksum(checksumFor(segment));
 				}
+				//Log.i(TAG, "Sending segment " + segment);
 				ip.ip_send(packetFrom(sentPacket, segment));
 				return true;
 			} catch (IOException e) {
@@ -364,7 +389,6 @@ public class TCP {
 		private boolean receiveSynSegment(TcpSegment segment) {
 			do {
 				receiveSegment(segment);
-
 			} while (!segment.hasFlags(SYN_FLAG, ACK_FLAG | FIN_FLAG));
 			return true;
 		}
@@ -433,10 +457,12 @@ public class TCP {
 		}
 		
 		private void onDelayedSynAckReceived(int synAckSeq) {
+			Log.i(TAG, "Received delayed SYN ACK segment. Acknowledging...");
 			sendAckSegment(receivedSegment, synAckSeq + 1);
 		}
 		
 		private void onFinReceived(int remoteSeqNumber) {
+			Log.i(TAG, "Received FIN segment. Acknowledging...");
 			sendAckSegment(receivedSegment, remoteSeqNumber);
 			
 			if (state == ConnectionState.ESTABLISHED) {
@@ -447,6 +473,7 @@ public class TCP {
 				remotePort = 0;
 				remoteEstablished = false;
 			}
+			Log.i(TAG, "Connection state is now " + state);
 		}
 		// @formatter:on
 
@@ -474,7 +501,12 @@ public class TCP {
 					if (remoteAddress == 0) {
 						remoteAddress = Integer.reverseBytes(receivedPacket.source);
 					}
-					return isValid(segment);
+					if (!isValid(segment)) {
+						return false;
+					} else {
+						//Log.i(TAG, "Received segment " + segment);
+						return true;
+					}
 				}
 			} catch (InterruptedException e) {
 				return false;

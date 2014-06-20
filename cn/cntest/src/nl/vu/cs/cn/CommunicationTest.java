@@ -62,8 +62,8 @@ public class CommunicationTest extends TestCase {
 		assertEquals(serverMessage, new String(clientReadBuf));
 	}
 	
-	public void IGNORE_testBusyServer() throws IOException, InterruptedException {
-		final int CLIENTS_SIZE = 10; // if changed add new responses; if more that 100 change SERVER_ADDR;
+	public void testBusyServer() throws IOException, InterruptedException {
+		final int CLIENTS_SIZE = 5; // if changed add new responses; if more that 100 change SERVER_ADDR;
 		final int RESPONSE_MAX_SIZE = 100;
 		final int MAX_RUN_TIME_SEC = 600;
 		
@@ -105,7 +105,7 @@ public class CommunicationTest extends TestCase {
 				
 				do  {
 					try {
-						Thread.sleep(rnd.nextInt(4000) + 1000);
+						Thread.sleep(rnd.nextInt(10000) + 10000);
 					} catch (InterruptedException fuckIt) { }
 				} while (!clients[id].connect(serverAddr, SERVER_PORT));
 				clients[id].write(query, 0, query.length);
