@@ -6,7 +6,7 @@ import nl.vu.cs.cn.util.InfiniteByteBuffer;
 
 	/* package */ static int TCP_SEGMENT_INIT_LENGTH = 32;
 	
-	/* package */ static int TCP_MAX_DATA_LENGTH = 128;
+	/* package */ static int TCP_MAX_DATA_LENGTH = 8152;
 	
 	public void fromByteArray(byte[] data, int length) {
 		if (data != buffer.array()) {
@@ -123,7 +123,9 @@ import nl.vu.cs.cn.util.InfiniteByteBuffer;
 		builder.append("push_flag = ").append(hasPushFlag()).append("; ");
 		builder.append("window_size = ").append(getWindow()).append("; ");
 		builder.append("checksum = ").append(getChecksum()).append("; ");
-		builder.append("data = \"").append(new String(data)).append("\"];");
+		builder.append("data = \"").append(new String(data)).append("\"; ");
+		builder.append("segment_length = ").append(length).append("; ");
+		builder.append("data_length = ").append(dataLength).append("]");
 		
 		return builder.toString();
 	}

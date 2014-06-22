@@ -190,7 +190,7 @@ public class TCP {
 			checkState(state == ConnectionState.ESTABLISHED
 					|| state == ConnectionState.WRITE_ONLY);
 
-			Log.i(TAG, "Writing message: " + new String(buf, offset, len));
+			Log.i(TAG, "Writing message: \"" + new String(buf, offset, len) + "\"");
 			int dataLeft = len;
 			int currOffset = offset;
 			while (dataLeft > 0) {
@@ -270,11 +270,14 @@ public class TCP {
 		private boolean isValid(TcpSegment segment) {
 			boolean result = true;
 			if (segment.length < TcpSegment.TCP_HEADER_LENGTH) {
+				Log.i(TAG, "Received segment is too short: " + segment.length);
 				result = false;
 			}
 
 			short checksum = checksumFor(segment);
 			if (checksum != 0) {
+				Log.i(TAG, "Received segment has invalid checksum: " + checksum);
+				Log.i(TAG, "" + segment);
 				result = false;
 			}
 
@@ -493,14 +496,17 @@ public class TCP {
 				for (;;) {
 					ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
 					if (receivedPacket.protocol != IP.TCP_PROTOCOL) {
+						Log.i(TAG, "Received packet with invalid protocol number: " + receivedPacket.protocol);
 						continue;
 					}
 					int remoteAddressHost = Integer.reverseBytes(remoteAddress);
 					if (remoteAddress != 0 && remoteAddressHost != receivedPacket.source) {
+						Log.i(TAG, "Received packet from invalid host: " + receivedPacket.source);
 						continue;
 					}
 					segment = segmentFrom(receivedPacket, segment);
 					if (remotePort != 0 && segment.getFromPort() != remotePort) {
+						Log.i(TAG, "Received packet from invalid port " + segment.getFromPort());
 						continue;
 					}
 					if (remoteAddress == 0) {
