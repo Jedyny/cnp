@@ -8,6 +8,8 @@ import nl.vu.cs.cn.util.InfiniteByteBuffer;
 	
 	/* package */ static int TCP_MAX_DATA_LENGTH = 8152;
 	
+	// wrap the given data inside this segment
+	// the previous data is lost
 	public void fromByteArray(byte[] data, int length) {
 		if (data != buffer.array()) {
 			buffer.putArray(0, data, 0, length);
@@ -44,11 +46,14 @@ import nl.vu.cs.cn.util.InfiniteByteBuffer;
 		return buffer.getShort(CHECKSUM_IX);
 	}
 	
+	// populate the given array with this segment data
 	public void getData(byte[] dst, int dstOffset, int maxlen) {
 		int toCopy = Math.min(maxlen, dataLength);
 		buffer.getArray(DATA_IX, dst, dstOffset, toCopy);
 	}
 	
+	// checks if this segment has all flags from allOfMask
+	// and none of from noneOfMask
 	public boolean hasFlags(int allOfMask, int noneOfMask) {
 		int flags = buffer.get(FLAGS_IX);
 		
@@ -101,6 +106,8 @@ import nl.vu.cs.cn.util.InfiniteByteBuffer;
 		buffer.putShort(CHECKSUM_IX, checksum);
 	}
 	
+	// populate this segment with the given data
+	// internal buffer size is automatically increased when needed
 	public void setData(byte[] src, int srcOffset, int length) {
 		buffer.putArray(DATA_IX, src, srcOffset, length);
 		this.length = length + TCP_HEADER_LENGTH;

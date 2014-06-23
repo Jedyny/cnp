@@ -92,9 +92,6 @@ public class TCP {
 			return true;
 		}
 
-		// take into account that this method don't have timeout after receiving
-		// first syn
-		// so it'll block on half-open connection
 		/**
 		 * Accept a connection on this socket. This call blocks until a connection
 		 * is made.
@@ -235,6 +232,7 @@ public class TCP {
 			return true;
 		}
 		
+		// cleans this socket state when the both sides of a connection are closed
 		private void realClose() {
 			state = ConnectionState.CLOSED;
 			closed = true;
@@ -244,7 +242,7 @@ public class TCP {
 			freePort(localPort);
 		}
 
-		// package to simplify testing
+		// calculates a checksum for the given segment
 		/* package */short checksumFor(TcpSegment segment) {
 			long sum = 0;
 
@@ -273,6 +271,7 @@ public class TCP {
 			return (short) sum;
 		}
 
+		// checks if this segment has valid length and checksum
 		private boolean isValid(TcpSegment segment) {
 			boolean result = true;
 			if (segment.length < TcpSegment.TCP_HEADER_LENGTH) {
@@ -318,12 +317,16 @@ public class TCP {
 			segment.dataLength = 0;
 		}
 
+		// send a SYN segment and wait for an acknowledgment
+		// resend if necessary
 		private boolean deliverSynSegment() {
 			fillBasicSegmentData(sentSegment);
 			sentSegment.setFlags((byte) (SYN_FLAG | PUSH_FLAG));
 			return deliverSegment(sentSegment, true) != -1;
 		}
 
+		// send a SYN-ACK segment and wait for an acknowledgment
+		// resend if necessary
 		private boolean deliverSynAckSegment() {
 			fillBasicSegmentData(sentSegment);
 			sentSegment.setAck(remoteSequenceNumber);
@@ -336,6 +339,8 @@ public class TCP {
 			}
 		}
 
+		// wrap the given data into a segment, send it and wait for an
+		// acknowledgment; resend if necessary
 		private int deliverDataSegment(byte[] src, int offset, int len) {
 			fillBasicSegmentData(sentSegment);
 			sentSegment.setData(src, offset, len);
@@ -343,6 +348,8 @@ public class TCP {
 			return deliverSegment(sentSegment);
 		}
 
+		// send a FIN segment and wait for an acknowledgment; 
+		// resend if necessary
 		private boolean deliverFinSegment() {
 			fillBasicSegmentData(sentSegment);
 			sentSegment.setFlags((byte) (FIN_FLAG | PUSH_FLAG));
@@ -354,7 +361,8 @@ public class TCP {
 			return deliverSegment(segment, false);
 		}
 
-		// send a segment and waits for the appropriate ack
+		// sends a segment and waits for the appropriate ack
+		// resends if necessary 
 		private int deliverSegment(TcpSegment segment, boolean maybeSynAck) {
 			int ackOffset = segment.dataLength + 1;
 			int trialsLeft = TCP.MAX_RESEND_TRIALS;
@@ -372,6 +380,7 @@ public class TCP {
 			return (trialsLeft > 0 ? receivedSegment.getAck() : -1);
 		}
 
+		// sends an ACK segment
 		private boolean sendAckSegment(TcpSegment segment, int acknowledged) {
 			fillBasicSegmentData(segment);
 			segment.setAck(acknowledged);
@@ -385,7 +394,7 @@ public class TCP {
 			return false;
 		}
 
-		// package to simplify testing
+		// calculates a checksum for this segment and sends it
 		/* package */boolean sendSegment(TcpSegment segment) {
 			try {
 				// sometimes we are resending, checksum is already set, no need to calculate it again
@@ -402,6 +411,7 @@ public class TCP {
 			}
 		}
 
+		// waits until a valid SYN segment arrives
 		private boolean receiveSynSegment(TcpSegment segment) {
 			do {
 				receiveSegment(segment);
@@ -409,6 +419,8 @@ public class TCP {
 			return true;
 		}
 		
+		// waits until a valid ACK segment arrives or time expires
+		// handles FIN and resent SYN-ACK segments
 		private boolean receiveAckSegment(TcpSegment segment, int ackLowerBound, int ackOffset, boolean actuallySynAck) {
 			int allOf, noneOf;
 			allOf = (actuallySynAck ? ACK_FLAG | SYN_FLAG : ACK_FLAG);
@@ -437,7 +449,8 @@ public class TCP {
 				return false;
 			}
 		}
-		
+		// waits until a valid data segment arrives or time expires
+		// handles FIN and resent SYN-ACK segments
 		private boolean receiveDataSegment(TcpSegment segment, byte[] dst, int offset, int maxlen) {
 			for (;;) { // receiving valid segment should not cause failure even if it is not data
 				if (!receiveSegmentWithTimeout(segment, TCP.RECV_WAIT_TIMEOUT_SECONDS)) {
@@ -463,11 +476,13 @@ public class TCP {
 			}
 		}
 
+		// checks if this segment is valid SYN-ACK
 		private boolean isValidDelayedSynAck(TcpSegment segment) {
 			return segment.hasFlags(SYN_FLAG | ACK_FLAG, FIN_FLAG)
 					&& segment.getAck() == localSequenceNumber;
 		}
 
+		// checks if this segment is valid FIN
 		private boolean isValidFin(TcpSegment segment) {
 			return (segment.getSeq() == oldRemoteSequenceNumber || segment.getSeq() == remoteSequenceNumber)
 					&& segment.hasFlags(FIN_FLAG, SYN_FLAG | ACK_FLAG);
@@ -496,11 +511,13 @@ public class TCP {
 			Log.i(TAG, "Connection state is now " + state);
 		}
 
-		// package to simplify testing
+		// waits for a segment infinitely
 		/* package */boolean receiveSegment(TcpSegment segment) {
 			return receiveSegmentWithTimeout(segment, 0);
 		}
 
+		// waits for a segment timeoutSeconds
+		// segments from wrong host or with invalid checksum are dropped
 		/* package */boolean receiveSegmentWithTimeout(TcpSegment segment,
 				int timeoutSeconds) {
 			try {
@@ -621,12 +638,14 @@ public class TCP {
 		return new Socket(ip, (short) port);
 	}
 	
+	// frees the given port
 	private void freePort(int port) {
 		usedPorts.clear(port);
 	}
 	
 	private Random rnd = new Random();
 	
+	// generates a new random initial sequence number
 	/* package */ int getInitSequenceNumber() {
 		return rnd.nextInt();
 	}
