@@ -186,7 +186,6 @@ public class TCP {
 			checkNotNull(buf);
 			checkState(state == ConnectionState.ESTABLISHED
 					|| state == ConnectionState.WRITE_ONLY);
-
 			Log.i(TAG, "Writing message: \"" + new String(buf, offset, len) + "\"");
 			int dataLeft = len;
 			int currOffset = offset;
@@ -312,7 +311,8 @@ public class TCP {
 			segment.setSeq(localSequenceNumber);
 			segment.setAck(0);
 			segment.setChecksum((short) 0); // clear it
-			segment.setWindowSize((short) 1);
+			segment.setDataOffset();
+			segment.setWindowSize((short) TCP_MAX_DATA_LENGTH);
 			segment.length = TcpSegment.TCP_HEADER_LENGTH; // clear data
 			segment.dataLength = 0;
 		}

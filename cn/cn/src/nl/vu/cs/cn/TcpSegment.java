@@ -94,6 +94,13 @@ import nl.vu.cs.cn.util.InfiniteByteBuffer;
 		buffer.putInt(ACK_IX, ack);
 	}
 	
+	// always 5
+	// have to be moved, because offset field here is in reality
+	// offset + reserved combined, since Java has not 4-bit type
+	public void setDataOffset() {
+		buffer.put(DATA_OFFSET_IX, (byte) 80);
+	}
+	
 	public void setFlags(byte flags) {
 		buffer.put(FLAGS_IX, flags);
 	}
@@ -160,6 +167,8 @@ import nl.vu.cs.cn.util.InfiniteByteBuffer;
 	private static int SEQ_IX = 4;
 	
 	private static int ACK_IX = 8;
+	
+	private static int DATA_OFFSET_IX = 12;
 	
 	private static int FLAGS_IX = 13;
 	
