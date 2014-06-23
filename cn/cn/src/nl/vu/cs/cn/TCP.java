@@ -601,9 +601,8 @@ public class TCP {
 	 *             if the IP stack fails to initialize.
 	 */
 	public TCP(int address) throws IOException {
+		this();
 		ip = new IP(address);
-		usedPorts.clear();
-		usedPorts.set(0, 1023); // well-known ports
 	}
 	
 	/*
@@ -612,7 +611,7 @@ public class TCP {
 	 */
 	protected TCP() { 
 		usedPorts.clear();
-		usedPorts.set(0, 1023); // well-known ports
+		usedPorts.set(0, 1024); // well-known ports
 	}
 	
 	private static final int PORT_RANGE = 65535;
