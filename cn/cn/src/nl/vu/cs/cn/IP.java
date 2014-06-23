@@ -2,6 +2,8 @@ package nl.vu.cs.cn;
 
 import java.io.IOException;
 
+import nl.vu.cs.cn.util.Logs;
+
 /**
  * This class represents a virtual IP stack. A stack can be constructed
  * with addresses 1-254. The virtual IP address will then be 192.168.0.address.
@@ -186,10 +188,12 @@ public class IP {
 
         public String toString() {
             return "Source: " + IpAddress.htoa(source) + " Dest: " + IpAddress.htoa(destination) + " Proto: "
-                    + protocol + " Id: " + id + " Data: " + arrayString()
-                    + " Len: " + length;
+                    + protocol + " Id: " + id + " Data: [" + Logs.bytesToHex(data, 0, length)
+                    + "] Len: " + length;
         }
 
+        @Deprecated
+        @SuppressWarnings("unused")
         private String arrayString() {
         	StringBuffer dataString = new StringBuffer("[");
         	for (int i = 0; i < length; i++) {

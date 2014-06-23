@@ -11,6 +11,7 @@ import static nl.vu.cs.cn.util.Preconditions.checkNotNull;
 import static nl.vu.cs.cn.util.Preconditions.checkState;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Random;
 
@@ -401,8 +402,10 @@ public class TCP {
 				if (segment.getChecksum() == 0) { 
 					segment.setChecksum(checksumFor(segment));
 				}
+				packetFrom(sentPacket, segment);
 				if (SEND_RECEIVE_LOGGING_ENABLED) {
 					Log.i(TAG, "Sending segment " + segment);
+					Log.i(TAG, "As packet: " + sentPacket);
 				}
 				ip.ip_send(packetFrom(sentPacket, segment));
 				return true;
@@ -523,6 +526,9 @@ public class TCP {
 			try {
 				for (;;) {
 					ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
+					if (SEND_RECEIVE_LOGGING_ENABLED) {
+						Log.i(TAG, "Received packet: " + receivedPacket);
+					}
 					if (receivedPacket.protocol != IP.TCP_PROTOCOL) {
 						Log.i(TAG, "Received packet with invalid protocol number: " + receivedPacket.protocol);
 						continue;
@@ -550,6 +556,7 @@ public class TCP {
 					}
 				}
 			} catch (InterruptedException e) {
+				Log.i(TAG, "Failed to receive packet - timeout expired.");
 				return false;
 			} catch (IOException e) {
 				return false;
