@@ -27,8 +27,11 @@ public class SendReceiveTest extends TestCase {
 
 	@Override
 	public void setUp() throws IOException {
-		sender = new TCP(SENDER_ADDR).socket(SENDER_PORT);
-		receiver = new TCP(RECEIVER_ADDR).socket(RECEIVER_PORT);
+		TCP senderTcp = new TCP(SENDER_ADDR);
+		TCP receiverTcp = new TCP(RECEIVER_ADDR);
+		
+		sender = senderTcp.socket(SENDER_PORT);
+		receiver = receiverTcp.socket(RECEIVER_PORT);
 		
 		int senderIpLittleEndian = IpAddress.getAddress("192.168.0." + SENDER_ADDR).getAddress();
 		int receiverIpLittleEndian = IpAddress.getAddress("192.168.0." + RECEIVER_ADDR).getAddress();
@@ -36,8 +39,8 @@ public class SendReceiveTest extends TestCase {
 		sender.remoteAddress = Integer.reverseBytes(receiverIpLittleEndian);
 		receiver.remoteAddress = Integer.reverseBytes(senderIpLittleEndian);
 		
-		sender.localSequenceNumber = TCP.getInitSequenceNumber();
-		receiver.localSequenceNumber = TCP.getInitSequenceNumber();
+		sender.localSequenceNumber = senderTcp.getInitSequenceNumber();
+		receiver.localSequenceNumber = receiverTcp.getInitSequenceNumber();
 		
 		sender.remotePort = RECEIVER_PORT;
 		receiver.remotePort = SENDER_PORT;

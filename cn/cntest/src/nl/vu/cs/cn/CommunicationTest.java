@@ -114,7 +114,7 @@ public class CommunicationTest extends TestCase {
 		for (int i = 0; i < CLIENTS_SIZE; ++i) {
 			clients[i] = new TCP(CLIENT_ADDR + i).socket(); 
 		}
-		final Socket server = new TCP(SERVER_ADDR).socket(SERVER_PORT);
+		final TCP serverTcp = new TCP(SERVER_ADDR);
 		
 		final IpAddress serverAddr = IpAddress.getAddress("192.168.0." + SERVER_ADDR);
 		
@@ -163,6 +163,7 @@ public class CommunicationTest extends TestCase {
 				byte[] buf = new byte[1];
 				
 				for (int accepted = 0; accepted < CLIENTS_SIZE; ++accepted) {
+					Socket server = serverTcp.socket(SERVER_PORT);
 					server.accept();
 					int readResult = server.read(buf, 0, buf.length);
 					byte[] response = serverResponses[buf[0]].getBytes();

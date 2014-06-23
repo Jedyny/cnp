@@ -11,6 +11,8 @@ import static nl.vu.cs.cn.util.Preconditions.checkNotNull;
 import static nl.vu.cs.cn.util.Preconditions.checkState;
 
 import java.io.IOException;
+import java.util.BitSet;
+import java.util.Random;
 
 import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.IP.Packet;
@@ -27,19 +29,17 @@ public class TCP {
 	/** The underlying IP stack for this TCP stack. */
 	protected IP ip;
 	
-	private static final short DEFAULT_PORT = 1453;
-	private static short CURRENT_PORT = DEFAULT_PORT;
-	
 	/* package */ static final int RECV_WAIT_TIMEOUT_SECONDS = 1;
 	/* package */ static final int MAX_RESEND_TRIALS = 10;
-	
+
+	// when this variable is set true, every send and received packet will be logged
 	private static final boolean SEND_RECEIVE_LOGGING_ENABLED = true; 
 	
 	/**
 	 * This class represents a TCP socket.
 	 * 
 	 */
-	public static final class Socket {
+	public class Socket {
 		
 		private final String TAG;
 
@@ -70,11 +70,11 @@ public class TCP {
 		 */
 		public boolean connect(IpAddress dst, int port) {
 			Log.i(TAG, "Connecting to address: " + dst + "; port: " + port);
-			if (state != ConnectionState.CLOSED) {
+			if (state != ConnectionState.CLOSED && !closed) {
 				return false;
 			}
 
-			localSequenceNumber = TCP.getInitSequenceNumber();
+			localSequenceNumber = getInitSequenceNumber();
 			remoteAddress = Integer.reverseBytes(dst.getAddress());
 			remotePort = (short) port;
 			if (!deliverSynSegment()) {
@@ -100,13 +100,13 @@ public class TCP {
 		 * is made.
 		 */
 		public void accept() {
-			checkState(state == ConnectionState.CLOSED);
+			checkState(state == ConnectionState.CLOSED && !closed);
 			Log.i(TAG, "Listening on port " + localPort);
 			
 			for (;;) {
 				receiveSynSegment(receivedSegment);
 
-				localSequenceNumber = TCP.getInitSequenceNumber();
+				localSequenceNumber = getInitSequenceNumber();
 				remotePort = receivedSegment.getFromPort();
 				remoteSequenceNumber = receivedSegment.getSeq() + 1;
 				
@@ -197,7 +197,7 @@ public class TCP {
 				int dataLength = Math.min(dataLeft, TcpSegment.TCP_MAX_DATA_LENGTH);
 
 				int ack = deliverDataSegment(buf, currOffset, dataLength);
-				if (ack == -1) {
+				if (ack == -1) { // delivery failed
 					return len - dataLeft;
 				}
 
@@ -229,13 +229,19 @@ public class TCP {
 			if (state == ConnectionState.ESTABLISHED) {
 				state = ConnectionState.READ_ONLY;
 			} else if (state == ConnectionState.WRITE_ONLY) {
-				state = ConnectionState.CLOSED;
-				remoteAddress = 0;
-				remotePort = 0;
-				remoteEstablished = false;
+				realClose();
 			}
 			Log.i(TAG, "Current connection state: " + state);
 			return true;
+		}
+		
+		private void realClose() {
+			state = ConnectionState.CLOSED;
+			closed = true;
+			remoteAddress = 0;
+			remotePort = 0;
+			remoteEstablished = false;
+			freePort(localPort);
 		}
 
 		// package to simplify testing
@@ -284,6 +290,7 @@ public class TCP {
 			return result;
 		}
 
+		// wraps the given segment in the preallocated packet
 		/* package */Packet packetFrom(Packet packet, TcpSegment segment) {
 			packet.source = Integer.reverseBytes(localAddress);
 			packet.destination = Integer.reverseBytes(remoteAddress);
@@ -294,6 +301,7 @@ public class TCP {
 			return packet;
 		}
 
+		// extracts the data into the preallocated segment
 		private TcpSegment segmentFrom(Packet packet, TcpSegment segment) {
 			segment.fromByteArray(packet.data, packet.length);
 			return segment;
@@ -346,6 +354,7 @@ public class TCP {
 			return deliverSegment(segment, false);
 		}
 
+		// send a segment and waits for the appropriate ack
 		private int deliverSegment(TcpSegment segment, boolean maybeSynAck) {
 			int ackOffset = segment.dataLength + 1;
 			int trialsLeft = TCP.MAX_RESEND_TRIALS;
@@ -379,7 +388,7 @@ public class TCP {
 		// package to simplify testing
 		/* package */boolean sendSegment(TcpSegment segment) {
 			try {
-				// sometimes we are resending, no need to calculate it again
+				// sometimes we are resending, checksum is already set, no need to calculate it again
 				if (segment.getChecksum() == 0) { 
 					segment.setChecksum(checksumFor(segment));
 				}
@@ -393,7 +402,6 @@ public class TCP {
 			}
 		}
 
-		// @formatter:off
 		private boolean receiveSynSegment(TcpSegment segment) {
 			do {
 				receiveSegment(segment);
@@ -447,13 +455,14 @@ public class TCP {
 				&& segment.hasFlags(0, SYN_FLAG | ACK_FLAG | FIN_FLAG)
 		 		&& segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber >= 0) {
 				segment.getData(dst, offset, maxlen);
-				remoteEstablished = true;
+				// when we got segment other than syn-ack we are sure that other party established a connection
+				remoteEstablished = true; 
 				return true;
 			} else {
 				return false;
 			}
 		}
-		
+
 		private boolean isValidDelayedSynAck(TcpSegment segment) {
 			return segment.hasFlags(SYN_FLAG | ACK_FLAG, FIN_FLAG)
 					&& segment.getAck() == localSequenceNumber;
@@ -464,11 +473,17 @@ public class TCP {
 					&& segment.hasFlags(FIN_FLAG, SYN_FLAG | ACK_FLAG);
 		}
 		
+		// sometimes the ack we send after syn-ack is lost, and syn-ack is resend
+		// we handle this situation by sending ack again
+		// we are using receivedSegment to send this time to preserve packet we are currently sending
 		private void onDelayedSynAckReceived(int synAckSeq) {
 			Log.i(TAG, "Received delayed SYN ACK segment. Acknowledging...");
 			sendAckSegment(receivedSegment, synAckSeq + 1);
 		}
 		
+		// sometimes we still wait for data but fin arrives, we just acknowledge
+		// it and stop reading
+		// we are using receivedSegment to send this time to preserve packet we are currently sending
 		private void onFinReceived(int remoteSeqNumber) {
 			Log.i(TAG, "Received FIN segment. Acknowledging...");
 			sendAckSegment(receivedSegment, remoteSeqNumber);
@@ -476,14 +491,10 @@ public class TCP {
 			if (state == ConnectionState.ESTABLISHED) {
 				state = ConnectionState.WRITE_ONLY;
 			} else if (state == ConnectionState.READ_ONLY) {
-				state = ConnectionState.CLOSED;
-				remoteAddress = 0;
-				remotePort = 0;
-				remoteEstablished = false;
+				realClose();
 			}
 			Log.i(TAG, "Connection state is now " + state);
 		}
-		// @formatter:on
 
 		// package to simplify testing
 		/* package */boolean receiveSegment(TcpSegment segment) {
@@ -542,8 +553,10 @@ public class TCP {
 
 		/* package */int localSequenceNumber;
 
+		// the sequence number we expect the next packet to have
 		/* package */int remoteSequenceNumber;
 
+		// this number is used to determine if the received seq is in valid range
 		/* package */int oldRemoteSequenceNumber;
 
 		/* package */Packet sentPacket = new Packet();
@@ -554,7 +567,11 @@ public class TCP {
 
 		/* package */TcpSegment receivedSegment = new TcpSegment();
 
+		// true when we are sure that our remote partner has state == established
 		/* package */boolean remoteEstablished = false;
+		
+		// when closed, Socket cannot be used again
+		/* package */boolean closed = false;
 	}
 	
 	/**
@@ -568,18 +585,30 @@ public class TCP {
 	 */
 	public TCP(int address) throws IOException {
 		ip = new IP(address);
+		usedPorts.clear();
+		usedPorts.set(0, 1023); // well-known ports
 	}
 	
 	/*
-	 * for testing purposes
+	 * for testing purposes; 
+	 * we want to set our version of ip in subclasses of this class
 	 */
-	protected TCP() { }
-
+	protected TCP() { 
+		usedPorts.clear();
+		usedPorts.set(0, 1023); // well-known ports
+	}
+	
+	private static final int PORT_RANGE = 65535;
+	
+	private BitSet usedPorts = new BitSet(PORT_RANGE);
+	
 	/**
 	 * @return a new socket for this stack
 	 */
 	public Socket socket() {
-		return new Socket(ip, CURRENT_PORT++);
+		int port = usedPorts.nextClearBit(0);
+		usedPorts.set(port);
+		return new Socket(ip, (short) port);
 	}
 
 	/**
@@ -588,12 +617,18 @@ public class TCP {
 	 *            the port to bind the socket to.
 	 */
 	public Socket socket(int port) {
-		checkArgument(0 < port && port <= 65545);
+		checkArgument(0 < port && port <= 65545 && !usedPorts.get(port));
 		return new Socket(ip, (short) port);
 	}
 	
-	/* package */ static int getInitSequenceNumber() {
-		return 20051498;
+	private void freePort(int port) {
+		usedPorts.clear(port);
+	}
+	
+	private Random rnd = new Random();
+	
+	/* package */ int getInitSequenceNumber() {
+		return rnd.nextInt();
 	}
 	
 }

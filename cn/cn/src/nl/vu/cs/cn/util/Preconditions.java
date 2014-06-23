@@ -1,5 +1,8 @@
 package nl.vu.cs.cn.util;
 
+/*
+ * Simple Preconditions library similar to one found in Guava.
+ */
 public final class Preconditions {
 	
 	public static void checkArgument(boolean condition) {
