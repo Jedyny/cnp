@@ -1,7 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     android:orientation="vertical" >
 
+    <TextView
+        android:id="@+id/server_text_message"
+        android:layout_width="fill_parent"
+        android:layout_height="0dp"
+        android:layout_weight="40"
+        android:paddingTop="10dp" />
+    
+    <LinearLayout
+ 		android:id="@+id/server"
+ 		android:layout_width="fill_parent"
+ 		android:layout_height="wrap_content"
+ 		android:orientation="horizontal"
+ 		android:gravity="bottom">
+    
+    <EditText android:id="@+id/server_message"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_width="0dp"
+        android:hint="@string/edit_message" />
+    
+    <Button android:id="@+id/server_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:onClick="sendMessage"
+        android:text="@string/button_send" />
+   </LinearLayout>
+      
+     <TextView
+         android:id="@+id/client_text_message"
+         android:layout_width="fill_parent"
+         android:layout_height="0dp"
+         android:layout_weight="40"
+         android:paddingTop="10dp" />
+    
+    <LinearLayout
+ 		android:id="@+id/client"
+ 		android:layout_width="fill_parent"
+ 		android:layout_height="wrap_content"
+ 		android:orientation="horizontal"
+ 		android:gravity="bottom">
+    
+    <EditText android:id="@+id/client_message"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_width="0dp"
+        android:hint="@string/edit_message" />
+    
+    <Button android:id="@+id/client_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:onClick="sendMessage"
+        android:text="@string/button_send" />
+  </LinearLayout>  
 </LinearLayout>
