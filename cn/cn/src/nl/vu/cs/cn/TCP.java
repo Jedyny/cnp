@@ -310,10 +310,10 @@ public class TCP {
 			segment.setFromPort(localPort);
 			segment.setToPort(remotePort);
 			segment.setSeq(localSequenceNumber);
-			segment.setAck(0);
+			segment.setAck(remoteSequenceNumber);
 			segment.setChecksum((short) 0); // clear it
 			segment.setDataOffset();
-			segment.setWindowSize((short) TCP_MAX_DATA_LENGTH);
+			segment.setWindowSize((short) 1);
 			segment.length = TcpSegment.TCP_HEADER_LENGTH; // clear data
 			segment.dataLength = 0;
 		}
@@ -345,7 +345,7 @@ public class TCP {
 		private int deliverDataSegment(byte[] src, int offset, int len) {
 			fillBasicSegmentData(sentSegment);
 			sentSegment.setData(src, offset, len);
-			sentSegment.setFlags((byte) PUSH_FLAG);
+			sentSegment.setFlags((byte) (ACK_FLAG | PUSH_FLAG));
 			return deliverSegment(sentSegment);
 		}
 
@@ -468,7 +468,7 @@ public class TCP {
 				break;
 			}
 			if ((segment.getSeq() == oldRemoteSequenceNumber || segment.getSeq() == remoteSequenceNumber)
-				&& segment.hasFlags(0, SYN_FLAG | ACK_FLAG | FIN_FLAG)
+				&& segment.hasFlags(0, SYN_FLAG | FIN_FLAG)
 		 		&& segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber >= 0) {
 				segment.getData(dst, offset, maxlen);
 				// when we got segment other than syn-ack we are sure that other party established a connection
