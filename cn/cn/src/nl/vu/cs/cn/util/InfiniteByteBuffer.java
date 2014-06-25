@@ -3,12 +3,14 @@ package nl.vu.cs.cn.util;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+// a ByteBuffer implementation that increases its size when needed
 public class InfiniteByteBuffer {
 	
-	public static InfiniteByteBuffer withCapacity(int initial_size) {
+	// returns a new instance of this class with the given initial size
+	public static InfiniteByteBuffer withCapacity(int initialSize) {
 		InfiniteByteBuffer product = new InfiniteByteBuffer();
-		product.buffer = ByteBuffer.allocate(initial_size);
-		product.length = initial_size;
+		product.buffer = ByteBuffer.allocate(initialSize);
+		product.length = initialSize;
 		return product;
 	}
 	

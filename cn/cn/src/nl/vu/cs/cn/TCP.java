@@ -11,6 +11,7 @@ import static nl.vu.cs.cn.util.Preconditions.checkNotNull;
 import static nl.vu.cs.cn.util.Preconditions.checkState;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Random;
 
@@ -186,7 +187,6 @@ public class TCP {
 			checkNotNull(buf);
 			checkState(state == ConnectionState.ESTABLISHED
 					|| state == ConnectionState.WRITE_ONLY);
-
 			Log.i(TAG, "Writing message: \"" + new String(buf, offset, len) + "\"");
 			int dataLeft = len;
 			int currOffset = offset;
@@ -310,8 +310,9 @@ public class TCP {
 			segment.setFromPort(localPort);
 			segment.setToPort(remotePort);
 			segment.setSeq(localSequenceNumber);
-			segment.setAck(0);
+			segment.setAck(remoteSequenceNumber);
 			segment.setChecksum((short) 0); // clear it
+			segment.setDataOffset();
 			segment.setWindowSize((short) 1);
 			segment.length = TcpSegment.TCP_HEADER_LENGTH; // clear data
 			segment.dataLength = 0;
@@ -344,7 +345,7 @@ public class TCP {
 		private int deliverDataSegment(byte[] src, int offset, int len) {
 			fillBasicSegmentData(sentSegment);
 			sentSegment.setData(src, offset, len);
-			sentSegment.setFlags((byte) PUSH_FLAG);
+			sentSegment.setFlags((byte) (ACK_FLAG | PUSH_FLAG));
 			return deliverSegment(sentSegment);
 		}
 
@@ -401,8 +402,10 @@ public class TCP {
 				if (segment.getChecksum() == 0) { 
 					segment.setChecksum(checksumFor(segment));
 				}
+				packetFrom(sentPacket, segment);
 				if (SEND_RECEIVE_LOGGING_ENABLED) {
 					Log.i(TAG, "Sending segment " + segment);
+					Log.i(TAG, "As packet: " + sentPacket);
 				}
 				ip.ip_send(packetFrom(sentPacket, segment));
 				return true;
@@ -465,7 +468,7 @@ public class TCP {
 				break;
 			}
 			if ((segment.getSeq() == oldRemoteSequenceNumber || segment.getSeq() == remoteSequenceNumber)
-				&& segment.hasFlags(0, SYN_FLAG | ACK_FLAG | FIN_FLAG)
+				&& segment.hasFlags(0, SYN_FLAG | FIN_FLAG)
 		 		&& segment.getSeq() + segment.dataLength - 1 - remoteSequenceNumber >= 0) {
 				segment.getData(dst, offset, maxlen);
 				// when we got segment other than syn-ack we are sure that other party established a connection
@@ -523,6 +526,9 @@ public class TCP {
 			try {
 				for (;;) {
 					ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
+					if (SEND_RECEIVE_LOGGING_ENABLED) {
+						Log.i(TAG, "Received packet: " + receivedPacket);
+					}
 					if (receivedPacket.protocol != IP.TCP_PROTOCOL) {
 						Log.i(TAG, "Received packet with invalid protocol number: " + receivedPacket.protocol);
 						continue;
@@ -550,6 +556,7 @@ public class TCP {
 					}
 				}
 			} catch (InterruptedException e) {
+				Log.i(TAG, "Failed to receive packet - timeout expired.");
 				return false;
 			} catch (IOException e) {
 				return false;
@@ -601,9 +608,8 @@ public class TCP {
 	 *             if the IP stack fails to initialize.
 	 */
 	public TCP(int address) throws IOException {
+		this();
 		ip = new IP(address);
-		usedPorts.clear();
-		usedPorts.set(0, 1023); // well-known ports
 	}
 	
 	/*
@@ -612,7 +618,7 @@ public class TCP {
 	 */
 	protected TCP() { 
 		usedPorts.clear();
-		usedPorts.set(0, 1023); // well-known ports
+		usedPorts.set(0, 1024); // well-known ports
 	}
 	
 	private static final int PORT_RANGE = 65535;
