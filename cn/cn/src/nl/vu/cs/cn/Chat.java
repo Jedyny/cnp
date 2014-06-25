@@ -53,21 +53,30 @@ public class Chat extends Activity {
 				final byte[] serverWriteBuf = serverMsg.getBytes();
 				final byte[] clientReadBuf = new byte[serverWriteBuf.length];
 				
-				executor.submit(new Runnable() {
+				Runnable serverTask = new Runnable() {
 					@Override public void run() {
 						server.write(serverWriteBuf, 0, serverWriteBuf.length);
 					}
-				});
+				};
 				
-				executor.submit(new Runnable() {
+				Runnable clientTask = new Runnable() {
 					@Override public void run() {
 						client.read(clientReadBuf, 0, clientReadBuf.length);
-						String receivedMsg = new String(clientReadBuf);
-						clientTextView.append(receivedMsg+ "\n");
-						serverMessage.setText("");
 					}
-				});
+				};
 				
+				Thread serverThread = new Thread(serverTask);
+				serverThread.start();
+				clientTask.run();
+				try {
+					serverThread.join();
+				} catch (InterruptedException e) {
+					Log.e("Interrupted", "Error",e );
+				}
+				
+				String receivedMsg = new String(clientReadBuf);
+				clientTextView.append(receivedMsg+ "\n");
+				serverMessage.setText("");
 
 		    }
 		});
@@ -80,42 +89,59 @@ public class Chat extends Activity {
 				final byte[] clientWriteBuf = clientMsg.getBytes();
 				final byte[] serverReadBuf = new byte[clientWriteBuf.length];
 				
-				executor.submit(new Runnable() {
+				Runnable serverTask = new Runnable() {
 					@Override public void run() {
 						server.read(serverReadBuf, 0, serverReadBuf.length);
-						String receivedMsg = new String(serverReadBuf);
-						serverTextView.append(receivedMsg + "\n");
-						clientMessage.setText("");
 					}
-				});
+				};
 				
-				executor.submit(new Runnable() {
+				Runnable clientTask = new Runnable() {
 					@Override public void run() {
 						client.write(clientWriteBuf, 0, clientWriteBuf.length);	
 					}
-				});
+				};
+				
+				Thread serverThread = new Thread(serverTask);
+				serverThread.start();
+				clientTask.run();
+				try {
+					serverThread.join();
+				} catch (InterruptedException e) {
+					Log.e("Interrupted", "Error",e );
+				}
+				
+				String receivedMsg = new String(serverReadBuf);
+				serverTextView.append(receivedMsg + "\n");
+				clientMessage.setText("");
+				
 		    }
-		});
-		
-		executor = Executors.newFixedThreadPool(2);
-			
-}
+		});			
+	}
 			 
 	
 	public void onPause() {
 	    super.onPause();  // Always call the superclass method first
 	    
-	    executor.submit(new Runnable() {
+	    Runnable serverTask = new Runnable() {
 			@Override public void run() {
 				server.close();
 			}
-		});
+		};
 		
-	    executor.submit(new Runnable() {
+		Runnable clientTask = new Runnable() {
 			@Override public void run() {
 				client.close();	
 			}
-		});
+		};
+		
+		Thread serverThread = new Thread(serverTask);
+		serverThread.start();
+		clientTask.run();
+		try {
+			serverThread.join();
+		} catch (InterruptedException e) {
+			Log.e("Interrupted", "Error",e );
+		}
 		  
 	}
 	
@@ -128,26 +154,32 @@ public class Chat extends Activity {
 			client = new TCP(CLIENT_IP).socket();
 			server = new TCP(SERVER_IP).socket(SERVER_PORT);
 			
-			executor.submit(new Runnable() {
+			Runnable clientTask = new Runnable() {
 				@Override public void run() {
 					IpAddress serverAddr = IpAddress.getAddress("192.168.0." + SERVER_IP);
 					client.connect(serverAddr, SERVER_PORT);
 				}
-			});
+			};
 			
-			executor.submit(new Runnable() {
+			Runnable serverTask = new Runnable() {
 				@Override public void run() {
 					server.accept();
 				}
-			});
+			};
 			
+			Thread serverThread = new Thread(serverTask);
+			serverThread.start();
+			clientTask.run();
+			serverThread.join();
 		} catch (IOException ioe) {
 			Log.e("TCP", "Error",ioe );
+		}catch (InterruptedException e) {
+			Log.e("TCP", "Error",e);
 		}
 	}
 	
 	public void onDestroy(){
 		super.onDestroy(); 
-		executor.shutdownNow();
+		//executor.shutdownNow();
 	}
 }
