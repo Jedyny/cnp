@@ -2,9 +2,6 @@ package nl.vu.cs.cn;
 
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.TCP.Socket;
