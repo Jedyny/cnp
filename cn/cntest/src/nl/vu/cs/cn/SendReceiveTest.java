@@ -108,8 +108,8 @@ public class SendReceiveTest extends TestCase {
 		segment.setData(data, 0, data.length);
 		sender.sendSegment(segment);
 		
-		receiver.receiveSegment(receiver.receivedSegment);
-		TcpSegment receivedSegment = receiver.receivedSegment;
+		receiver.receiveSegment(receiver.segment);
+		TcpSegment receivedSegment = receiver.segment;
 		
 		assertEquals(receivedSegment.getFromPort(), sender.localPort);
 		assertEquals(receivedSegment.getToPort(), receiver.localPort);
@@ -145,8 +145,8 @@ public class SendReceiveTest extends TestCase {
 		TcpSegment segment = newSegment(sender,0,(byte)(PUSH_FLAG));
 		segment.setChecksum((short)21234);
 		
-		sender.ip.ip_send(sender.packetFrom(sender.sentPacket, segment));
-		boolean check = receiver.receiveSegmentWithTimeout(receiver.receivedSegment, TCP.RECV_WAIT_TIMEOUT_SECONDS);
+		sender.ip.ip_send(sender.packetFrom(sender.packet, segment));
+		boolean check = receiver.receiveSegmentWithTimeout(receiver.segment, TCP.RECV_WAIT_TIMEOUT_SECONDS);
 		
 		assertEquals(check, false);
 	}
@@ -164,7 +164,7 @@ public class SendReceiveTest extends TestCase {
 		sentPacket.length = segment.length;
 		segment.setChecksum(sender.checksumFor(segment));
 		sender.ip.ip_send(sentPacket);
-		boolean check = receiver.receiveSegmentWithTimeout(receiver.receivedSegment, TCP.RECV_WAIT_TIMEOUT_SECONDS);
+		boolean check = receiver.receiveSegmentWithTimeout(receiver.segment, TCP.RECV_WAIT_TIMEOUT_SECONDS);
 		
 		assertEquals(check, false);
 	}
@@ -182,7 +182,7 @@ public class SendReceiveTest extends TestCase {
 		sentPacket.length = 5;
 		
 		sender.ip.ip_send(sentPacket);
-		boolean check = receiver.receiveSegmentWithTimeout(receiver.receivedSegment, TCP.RECV_WAIT_TIMEOUT_SECONDS);
+		boolean check = receiver.receiveSegmentWithTimeout(receiver.segment, TCP.RECV_WAIT_TIMEOUT_SECONDS);
 		
 		assertEquals(check, false);
 	}

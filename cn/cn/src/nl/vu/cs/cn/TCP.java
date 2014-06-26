@@ -11,7 +11,6 @@ import static nl.vu.cs.cn.util.Preconditions.checkNotNull;
 import static nl.vu.cs.cn.util.Preconditions.checkState;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Random;
 
@@ -54,8 +53,8 @@ public class TCP {
 			this.ip = ip;
 			int localAddressLittleEndian = ip.getLocalAddress().getAddress();
 			localAddress = Integer.reverseBytes(localAddressLittleEndian);
-			sentPacket.data = new byte[TCP_HEADER_LENGTH + TCP_MAX_DATA_LENGTH];
-			receivedPacket.data = new byte[TCP_HEADER_LENGTH + TCP_MAX_DATA_LENGTH];
+			packet.data = new byte[TCP_HEADER_LENGTH + TCP_MAX_DATA_LENGTH];
+			packet.data = new byte[TCP_HEADER_LENGTH + TCP_MAX_DATA_LENGTH];
 			localPort = (short) port;
 			TAG = "Socket (" + ip.getLocalAddress() + ":" + localPort + ")"; 
 		}
@@ -84,7 +83,7 @@ public class TCP {
 
 			Log.i(TAG, "SYN sent and acknowledged");
 			++localSequenceNumber;
-			if (!sendAckSegment(sentSegment, receivedSegment.getSeq() + 1)) {
+			if (!sendAckSegment(segment, segment.getSeq() + 1)) {
 				return false;
 			}
 
@@ -102,11 +101,11 @@ public class TCP {
 			Log.i(TAG, "Listening on port " + localPort);
 			
 			for (;;) {
-				receiveSynSegment(receivedSegment);
+				receiveSynSegment(segment);
 
 				localSequenceNumber = getInitSequenceNumber();
-				remotePort = receivedSegment.getFromPort();
-				remoteSequenceNumber = receivedSegment.getSeq() + 1;
+				remotePort = segment.getFromPort();
+				remoteSequenceNumber = segment.getSeq() + 1;
 				
 				String addr = IpAddress.htoa(Integer.reverseBytes(remoteAddress));
 				Log.i(TAG, "Received SYN segment from address: " + addr + "; port: " + remotePort);
@@ -146,16 +145,16 @@ public class TCP {
 			while (currentOffset - offset < maxlen) {
 				int maxChunkSize = maxlen - (currentOffset - offset);
 				Log.i(TAG, "maxlen: " + maxlen + "; currOff: " + currentOffset + "; off: " + offset);
-				if (receiveDataSegment(receivedSegment, buf, currentOffset, maxChunkSize)) {
-					int recvLen = Math.min(receivedSegment.dataLength, maxChunkSize);
+				if (receiveDataSegment(segment, buf, currentOffset, maxChunkSize)) {
+					int recvLen = Math.min(segment.dataLength, maxChunkSize);
 					int newOffset = currentOffset + recvLen
-							+ receivedSegment.getSeq() - remoteSequenceNumber;
+							+ segment.getSeq() - remoteSequenceNumber;
 					Log.i(TAG, "" + (newOffset - currentOffset) + " new bytes received.");
 					currentOffset = newOffset;
 					
-					int toAcknowledge = receivedSegment.getSeq()
+					int toAcknowledge = segment.getSeq()
 							+ recvLen;
-					if (!sendAckSegment(sentSegment, toAcknowledge)) {
+					if (!sendAckSegment(segment, toAcknowledge)) {
 						return currentOffset - offset;
 					}
 					trials = TCP.MAX_RESEND_TRIALS;
@@ -321,18 +320,13 @@ public class TCP {
 		// send a SYN segment and wait for an acknowledgment
 		// resend if necessary
 		private boolean deliverSynSegment() {
-			fillBasicSegmentData(sentSegment);
-			sentSegment.setFlags((byte) (SYN_FLAG | PUSH_FLAG));
-			return deliverSegment(sentSegment, true) != -1;
+			return deliverSegment((byte) (SYN_FLAG | PUSH_FLAG), true) != -1;
 		}
 
 		// send a SYN-ACK segment and wait for an acknowledgment
 		// resend if necessary
 		private boolean deliverSynAckSegment() {
-			fillBasicSegmentData(sentSegment);
-			sentSegment.setAck(remoteSequenceNumber);
-			sentSegment.setFlags((byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
-			if (deliverSegment(sentSegment) != -1) {
+			if (deliverSegment((byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG)) != -1) {
 				remoteEstablished = true;
 				return true;
 			} else {
@@ -343,42 +337,50 @@ public class TCP {
 		// wrap the given data into a segment, send it and wait for an
 		// acknowledgment; resend if necessary
 		private int deliverDataSegment(byte[] src, int offset, int len) {
-			fillBasicSegmentData(sentSegment);
-			sentSegment.setData(src, offset, len);
-			sentSegment.setFlags((byte) (ACK_FLAG | PUSH_FLAG));
-			return deliverSegment(sentSegment);
+			return deliverSegment((byte) (ACK_FLAG | PUSH_FLAG), src, offset, len);
 		}
 
 		// send a FIN segment and wait for an acknowledgment; 
 		// resend if necessary
 		private boolean deliverFinSegment() {
-			fillBasicSegmentData(sentSegment);
-			sentSegment.setFlags((byte) (FIN_FLAG | PUSH_FLAG));
-			return deliverSegment(sentSegment) != -1;
+			return deliverSegment((byte) (FIN_FLAG | PUSH_FLAG)) != -1;
 		}
 
 		/* returns last acked byte or -1 in case of failure */
-		private int deliverSegment(TcpSegment segment) {
-			return deliverSegment(segment, false);
+		private int deliverSegment(byte flags) {
+			return deliverSegment(flags, null, 0, 0, false);
+		}
+		
+		private int deliverSegment(byte flags, boolean maybeSynAck) {
+			return deliverSegment(flags, null, 0, 0, maybeSynAck);
+		}
+		
+		private int deliverSegment(byte flags, byte[] src, int offset, int len) {
+			return deliverSegment(flags, src, offset, len, false);
 		}
 
 		// sends a segment and waits for the appropriate ack
 		// resends if necessary 
-		private int deliverSegment(TcpSegment segment, boolean maybeSynAck) {
-			int ackOffset = segment.dataLength + 1;
+		private int deliverSegment(byte flags, byte[] src, int offset, int len, boolean maybeSynAck) {
 			int trialsLeft = TCP.MAX_RESEND_TRIALS;
 			for (; trialsLeft > 0; --trialsLeft) {
+				fillBasicSegmentData(segment);
+				segment.setFlags(flags);
+				if (src != null) {
+					segment.setData(src, offset, len);
+				}
+				int ackOffset = segment.dataLength + 1;
 				if (!sendSegment(segment)) {
 					continue;
 				}
 
-				if (receiveAckSegment(receivedSegment, localSequenceNumber,
+				if (receiveAckSegment(segment, localSequenceNumber,
 						ackOffset, maybeSynAck)) {
 					break;
 				}
 			}
 
-			return (trialsLeft > 0 ? receivedSegment.getAck() : -1);
+			return (trialsLeft > 0 ? segment.getAck() : -1);
 		}
 
 		// sends an ACK segment
@@ -398,16 +400,13 @@ public class TCP {
 		// calculates a checksum for this segment and sends it
 		/* package */boolean sendSegment(TcpSegment segment) {
 			try {
-				// sometimes we are resending, checksum is already set, no need to calculate it again
-				if (segment.getChecksum() == 0) { 
-					segment.setChecksum(checksumFor(segment));
-				}
-				packetFrom(sentPacket, segment);
+				segment.setChecksum(checksumFor(segment));
+				packetFrom(packet, segment);
 				if (SEND_RECEIVE_LOGGING_ENABLED) {
 					Log.i(TAG, "Sending segment " + segment);
-					Log.i(TAG, "As packet: " + sentPacket);
+					Log.i(TAG, "As packet: " + packet);
 				}
-				ip.ip_send(packetFrom(sentPacket, segment));
+				ip.ip_send(packetFrom(packet, segment));
 				return true;
 			} catch (IOException e) {
 				return false;
@@ -493,18 +492,16 @@ public class TCP {
 		
 		// sometimes the ack we send after syn-ack is lost, and syn-ack is resend
 		// we handle this situation by sending ack again
-		// we are using receivedSegment to send this time to preserve packet we are currently sending
 		private void onDelayedSynAckReceived(int synAckSeq) {
 			Log.i(TAG, "Received delayed SYN ACK segment. Acknowledging...");
-			sendAckSegment(receivedSegment, synAckSeq + 1);
+			sendAckSegment(segment, synAckSeq + 1);
 		}
 		
 		// sometimes we still wait for data but fin arrives, we just acknowledge
 		// it and stop reading
-		// we are using receivedSegment to send this time to preserve packet we are currently sending
 		private void onFinReceived(int remoteSeqNumber) {
 			Log.i(TAG, "Received FIN segment. Acknowledging...");
-			sendAckSegment(receivedSegment, remoteSeqNumber);
+			sendAckSegment(segment, remoteSeqNumber);
 			
 			if (state == ConnectionState.ESTABLISHED) {
 				state = ConnectionState.WRITE_ONLY;
@@ -525,26 +522,26 @@ public class TCP {
 				int timeoutSeconds) {
 			try {
 				for (;;) {
-					ip.ip_receive_timeout(receivedPacket, timeoutSeconds);
+					ip.ip_receive_timeout(packet, timeoutSeconds);
 					if (SEND_RECEIVE_LOGGING_ENABLED) {
-						Log.i(TAG, "Received packet: " + receivedPacket);
+						Log.i(TAG, "Received packet: " + packet);
 					}
-					if (receivedPacket.protocol != IP.TCP_PROTOCOL) {
-						Log.i(TAG, "Received packet with invalid protocol number: " + receivedPacket.protocol);
+					if (packet.protocol != IP.TCP_PROTOCOL) {
+						Log.i(TAG, "Received packet with invalid protocol number: " + packet.protocol);
 						continue;
 					}
 					int remoteAddressHost = Integer.reverseBytes(remoteAddress);
-					if (remoteAddress != 0 && remoteAddressHost != receivedPacket.source) {
-						Log.i(TAG, "Received packet from invalid host: " + receivedPacket.source);
+					if (remoteAddress != 0 && remoteAddressHost != packet.source) {
+						Log.i(TAG, "Received packet from invalid host: " + packet.source);
 						continue;
 					}
-					segment = segmentFrom(receivedPacket, segment);
+					segment = segmentFrom(packet, segment);
 					if (remotePort != 0 && segment.getFromPort() != remotePort) {
 						Log.i(TAG, "Received packet from invalid port " + segment.getFromPort());
 						continue;
 					}
 					if (remoteAddress == 0) {
-						remoteAddress = Integer.reverseBytes(receivedPacket.source);
+						remoteAddress = Integer.reverseBytes(packet.source);
 					}
 					if (!isValid(segment)) {
 						return false;
@@ -583,13 +580,9 @@ public class TCP {
 		// this number is used to determine if the received seq is in valid range
 		/* package */int oldRemoteSequenceNumber;
 
-		/* package */Packet sentPacket = new Packet();
+		/* package */Packet packet = new Packet();
 
-		/* package */TcpSegment sentSegment = new TcpSegment();
-
-		/* package */Packet receivedPacket = new Packet();
-
-		/* package */TcpSegment receivedSegment = new TcpSegment();
+		/* package */TcpSegment segment = new TcpSegment();
 
 		// true when we are sure that our remote partner has state == established
 		/* package */boolean remoteEstablished = false;

@@ -195,11 +195,11 @@ public class ConnectAcceptTest extends TestCase {
 		Runnable serverTestTask = new Runnable() {
 			@Override public void run() {
 				server.accept();
-				server.sentSegment = newSegment(server, client.localSequenceNumber, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
-				server.sentSegment.setSeq(server.localSequenceNumber - 1);
-				server.sendSegment(server.sentSegment);
+				server.segment = newSegment(server, client.localSequenceNumber, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
+				server.segment.setSeq(server.localSequenceNumber - 1);
+				server.sendSegment(server.segment);
 				
-				server.receiveSegment(server.receivedSegment);
+				server.receiveSegment(server.segment);
 			}
 		};
 		
@@ -208,8 +208,8 @@ public class ConnectAcceptTest extends TestCase {
 		clientTestTask.run();
 		serverThread.join();
 		
-		assertEquals(server.localSequenceNumber, server.receivedSegment.getAck());
-		assertTrue(server.receivedSegment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG));
+		assertEquals(server.localSequenceNumber, server.segment.getAck());
+		assertTrue(server.segment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG));
 	}
 	
 	public void testAckLostClientWrites() throws IOException,InterruptedException {
@@ -231,17 +231,17 @@ public class ConnectAcceptTest extends TestCase {
 			@Override public void run() {
 				server.accept();
 				
-				server.sentSegment = newSegment(server, client.localSequenceNumber, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
-				server.sentSegment.setSeq(server.localSequenceNumber - 1);
-				server.sendSegment(server.sentSegment);
+				server.segment = newSegment(server, client.localSequenceNumber, (byte) (SYN_FLAG | ACK_FLAG | PUSH_FLAG));
+				server.segment.setSeq(server.localSequenceNumber - 1);
+				server.sendSegment(server.segment);
 				
-				server.receiveSegment(server.receivedSegment);
-				boolean isFirstAck = server.localSequenceNumber == server.receivedSegment.getAck()
-						&& server.receivedSegment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG);
+				server.receiveSegment(server.segment);
+				boolean isFirstAck = server.localSequenceNumber == server.segment.getAck()
+						&& server.segment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG);
 				
-				server.receiveSegment(server.receivedSegment);
-				boolean isSecondAck = server.localSequenceNumber == server.receivedSegment.getAck()
-						&& server.receivedSegment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG);
+				server.receiveSegment(server.segment);
+				boolean isSecondAck = server.localSequenceNumber == server.segment.getAck()
+						&& server.segment.hasFlags(ACK_FLAG, SYN_FLAG | FIN_FLAG);
 
 				assertTrue(isFirstAck || isSecondAck);
 			}
