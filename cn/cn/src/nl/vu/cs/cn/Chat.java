@@ -24,6 +24,7 @@ public class Chat extends Activity {
 	public static int SERVER_IP = 10;
 	public static int SERVER_PORT = 4444;
 	Socket client, server;
+
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -45,8 +46,8 @@ public class Chat extends Activity {
 		
 			public void onClick(View arg0) {
 				
-				serverButtonSend.setEnabled(false);
-				clientButtonSend.setEnabled(false);
+			  serverButtonSend.setEnabled(false);
+		      clientButtonSend.setEnabled(false);
 				
 				String serverMsg = serverMessage.getText().toString();
 				final byte[] serverWriteBuf = serverMsg.getBytes();
@@ -183,5 +184,6 @@ public class Chat extends Activity {
 	
 	public void onDestroy(){
 		super.onDestroy(); 
+
 	}
 }
