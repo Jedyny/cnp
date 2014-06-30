@@ -46,9 +46,6 @@ public class Chat extends Activity {
 		
 			public void onClick(View arg0) {
 				
-			  serverButtonSend.setEnabled(false);
-		      clientButtonSend.setEnabled(false);
-				
 				String serverMsg = serverMessage.getText().toString();
 				final byte[] serverWriteBuf = serverMsg.getBytes();
 				final byte[] clientReadBuf = new byte[serverWriteBuf.length];
@@ -85,9 +82,6 @@ public class Chat extends Activity {
 		clientButtonSend.setOnClickListener(new OnClickListener(){
 			
 			public void onClick(View arg0) {
-				
-				serverButtonSend.setEnabled(false);
-				clientButtonSend.setEnabled(false);
 				
 				String clientMsg = clientMessage.getText().toString();				
 				final byte[] clientWriteBuf = clientMsg.getBytes();
