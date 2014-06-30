@@ -4,66 +4,47 @@
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     android:orientation="vertical" >
- 
-	<ScrollView
-	    android:layout_width="match_parent"
-	    android:layout_height="0dp"
-	    android:layout_weight="40" >
-    <TextView
-        android:id="@+id/server_text_message"
-        android:layout_width="match_parent"
-        android:layout_height="0dp" />
-    </ScrollView>
 
-    <LinearLayout
- 		android:id="@+id/server"
- 		android:layout_width="fill_parent"
- 		android:layout_height="wrap_content"
- 		android:orientation="horizontal"
- 		android:gravity="bottom">
-    
-    <EditText android:id="@+id/server_message"
-        android:layout_height="wrap_content"
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_width="0dp"
-        android:hint="@string/edit_message" />
-    
-    <Button android:id="@+id/server_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:orientation="vertical" >
+
+        <EditText
+            android:id="@+id/upper_input_field"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/edit_message"
+            android:maxLength="32" >
+        </EditText>
+
+        <TextView
+            android:id="@+id/upper_chat_window"
+            android:layout_width="match_parent"
+            android:layout_height="fill_parent"
+            android:layout_below="@+id/upper_input_field"
+            android:scrollbars="vertical" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="0dp"
         android:layout_weight="1"
-        android:onClick="sendMessage"
-        android:text="@string/button_send" />
-   </LinearLayout>
-   
-    <ScrollView
-	    android:layout_width="match_parent"
-	    android:layout_height="0dp"
-  		android:layout_weight="40" > 
-     <TextView
-         android:id="@+id/client_text_message"
-         android:layout_width="match_parent"
-         android:layout_height="0dp" />
-    </ScrollView>
-    
-    <LinearLayout
- 		android:id="@+id/client"
- 		android:layout_width="fill_parent"
- 		android:layout_height="wrap_content"
- 		android:orientation="horizontal"
- 		android:gravity="bottom">
-    
-    <EditText android:id="@+id/client_message"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_width="0dp"
-        android:hint="@string/edit_message" />
-    
-    <Button android:id="@+id/client_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:onClick="sendMessage"
-        android:text="@string/button_send" />
-  </LinearLayout> 
+        android:orientation="horizontal" >
+
+        <EditText
+            android:id="@+id/lower_input_field"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/edit_message" />
+
+        <TextView
+            android:id="@+id/lower_chat_window"
+            android:layout_width="match_parent"
+            android:layout_height="fill_parent"
+            android:layout_below="@+id/lower_input_field"
+            android:scrollbars="vertical" />
+    </RelativeLayout>
+
 </LinearLayout>
